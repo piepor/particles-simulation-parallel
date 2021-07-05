@@ -170,7 +170,8 @@ struct i2dGrid* copyi2dGridInitialization(struct i2dGrid hostStruct) {
 	HANDLE_ERROR(cudaMalloc((void**) &deviceStruct, sizeof(hostStruct)));
   	HANDLE_ERROR(cudaMemcpy( deviceStruct, &hostStruct, sizeof(struct i2dGrid), cudaMemcpyHostToDevice ));
 	HANDLE_ERROR(cudaMalloc((void**) &deviceValues, sizeof(int) * hostStruct.EX * hostStruct.EY ));
-	deviceStruct->Values = deviceValues;
+	//deviceStruct->Values = deviceValues;
+  //deviceValues[0] = 1;
 	
   return deviceStruct;
 }
