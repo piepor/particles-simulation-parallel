@@ -153,16 +153,9 @@ void newparticle(struct particle *p, double weight, double x, double y, double v
 void ParticleGeneration(struct i2dGrid grid, struct i2dGrid pgrid, struct Population *pp);
 void SystemEvolution(struct i2dGrid *pgrid, struct Population *pp, int mxiter);
 void ForceCompt(double *f, struct particle p1, struct particle p2);
-void copyi2GridInitialization(struct i2Grid *hostStruct);
+//struct copyi2dGridInitialization(struct i2dGrid *hostStruct);
 // CUDA kernel
 // void GeneratingField(struct i2dGrid *grid, int MaxIt);
-
-
-struct i2dGrid {
-	int EX, EY; // extensions in X and Y directions
-	double Xs, Xe, Ys, Ye; // initial and final value for X and Y directions
-	int *Values; // 2D matrix of values
-} GenFieldGrid, ParticleGrid, GenFieldGridDev, ParticleGridDev;
 
 
 struct i2dGrid* copyi2dGridInitialization(struct i2dGrid hostStruct) {
@@ -434,14 +427,14 @@ void InitGrid(char *InputFile) {
 	// GenFieldGrid è 2000 x 2400 double = 38,4 MiB. Troppo grande per la shared memory
 	iv = GenFieldGrid.EX * GenFieldGrid.EY;
 	//cudaMalloc(&(GenFieldGridDev.Values), iv * sizeof(1));
-	GenFieldGrid.Values = malloc(iv * sizeof(1));
+	GenFieldGrid.Values = (int*) malloc(iv * sizeof(1));
 	if (GenFieldGrid.Values == NULL) {
 		fprintf(stderr, "Error allocating GenFieldGrid.Values \n");
 		exit(-1);
 	}
 	// ParticleGrid è 1000 x 1200 double = 9.6 MiB
 	iv = ParticleGrid.EX * ParticleGrid.EY;
-	ParticleGrid.Values = malloc(iv * sizeof(1));
+	ParticleGrid.Values = (int*) malloc(iv * sizeof(1));
 	if (ParticleGrid.Values == NULL) {
 		fprintf(stderr, "Error allocating ParticleGrid.Values \n");
 		exit(-1);
@@ -466,7 +459,7 @@ __global__ void GeneratingField(struct i2dGrid *grid, int MaxIt) {
 	//int izmn, izmx;
 	int Xdots, Ydots;
 	int offset;
-	fprintf(stdout, "Computing generating field ...\n");
+	//fprintf(stdout, "Computing generating field ...\n");
 	Xdots = grid->EX;
 	Ydots = grid->EY;
 	// numero di intersezioni lungo X e Y
@@ -536,11 +529,11 @@ void ParticleGeneration(struct i2dGrid grid, struct i2dGrid pgrid, struct Popula
 	}
 	// allocate memory space for particles
 	pp->np = np;
-	pp->weight = malloc(np * sizeof((double)1.0));
-	pp->x = malloc(np * sizeof((double)1.0));
-	pp->y = malloc(np * sizeof((double)1.0));
-	pp->vx = malloc(np * sizeof((double)1.0));
-	pp->vy = malloc(np * sizeof((double)1.0));
+	pp->weight = (double*) malloc(np * sizeof((double)1.0));
+	pp->x = (double*) malloc(np * sizeof((double)1.0));
+	pp->y = (double*) malloc(np * sizeof((double)1.0));
+	pp->vx = (double*) malloc(np * sizeof((double)1.0));
+	pp->vy = (double*) malloc(np * sizeof((double)1.0));
 	// Population initialization
 	n = 0;
 	for (ix = 0; ix < grid.EX; ix++) {
@@ -572,7 +565,7 @@ void SystemEvolution(struct i2dGrid *pgrid, struct Population *pp, int mxiter) {
 	double f[2];
 	int i, j, t;
 	// temporary array of forces
-	forces = malloc(2 * pp->np * sizeof((double)1.0));
+	forces = (double*) malloc(2 * pp->np * sizeof((double)1.0));
 	if (forces == NULL) {
 		fprintf(stderr, "Error mem alloc of forces!\n");
 		exit(1);
@@ -720,7 +713,8 @@ int rowlen(char *riga) {
 	return (0);
 }
 int readrow(char *rg, int nc, FILE *daleg) {
-	int rowlen(), lrg;
+	//int rowlen(), lrg;
+  int lrg;
 	if (fgets(rg, nc, daleg) == NULL)
 	      return (-1);
 	lrg = rowlen(rg);
@@ -821,21 +815,23 @@ int main(int argc, char *argv[]) /* FinalApplication */ {
 	InitGrid("Particles.inp");
 	
 	// 	copia valori di InitGrid su GPU e alloca spazio per le matrici
-	copyi2GridInitialization(GenFieldGrid);
-	copyi2GridInitialization(ParticleGrid);
+	struct i2dGrid* GenFieldGrid_dev = copyi2dGridInitialization(GenFieldGrid);
+	struct i2dGrid* ParticleGrid_dev = copyi2dGridInitialization(ParticleGrid);
 
 
 	// GenFieldGrid initialization
 	printf("GeneratingField...\n");
-	GeneratingField(&GenFieldGrid, MaxIters);
+  int TILE_WIDTH = 32;
+  dim3 dimBlock (TILE_WIDTH, TILE_WIDTH);
+  dim3 dimGrid ((GenFieldGrid.EX-1)/TILE_WIDTH+1, (GenFieldGrid.EX-1)/TILE_WIDTH+1);
+	//GeneratingField(&GenFieldGrid, MaxIters);
+  GeneratingField<<<dimGrid, dimBlock>>>(GenFieldGrid_dev, MaxIters);
+  copyBacki2dGridToHost(GenFieldGrid_dev, GenFieldGrid);
 	// Particle population initialization
 	printf("ParticleGeneration...\n");
 
-  TILE_WIDTH = 32;
-  dim3 dimBlock (TILE_WIDTH, TILE_WIDTH);
-  dim3 dimGrid ((GenFieldGrid.Ex-1)/TILE_WIDTH+1, (GenFieldGrid.Ex-1)/TILE_WIDTH+1);
-  //ParticleGeneration(GenFieldGrid, ParticleGrid, &Particles);
-  ParticleGeneration<<<dimGrid, dimBlock>>>(GenFieldGrid, ParticleGrid, &Particles);
+  ParticleGeneration(GenFieldGrid, ParticleGrid, &Particles);
+  //ParticleGeneration<<<dimGrid, dimBlock>>>(GenFieldGrid, ParticleGrid, &Particles);
 	// Compute evolution of the particle population
 	printf("SystemEvolution...\n");
 	SystemEvolution(&ParticleGrid, &Particles, MaxSteps);
