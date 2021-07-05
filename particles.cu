@@ -815,7 +815,9 @@ int main(int argc, char *argv[]) /* FinalApplication */ {
 	InitGrid("Particles.inp");
 	
 	// 	copia valori di InitGrid su GPU e alloca spazio per le matrici
+	printf("Copy to device...\n");
 	struct i2dGrid* GenFieldGrid_dev = copyi2dGridInitialization(GenFieldGrid);
+	printf("Copy to device 2...\n");
 	struct i2dGrid* ParticleGrid_dev = copyi2dGridInitialization(ParticleGrid);
 
 
