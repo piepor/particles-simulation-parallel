@@ -1,0 +1,25 @@
+#!/bin/bash
+#SBATCH --nodes=1                   # nodes 
+#SBATCH --ntasks-per-node=1   # MPI tasks/node
+#SBATCH --cpus-per-task=1     # OpenMP threads/task
+#SBATCH --time=0:10:00        # max 24:00:00
+#SBATCH --mem=4GB           # max memory/node=118GB, 3.5 GB/core
+#SBATCH --account=tra20_cpolimi     # account name
+#SBATCH --partition=gll_usr_prod     # partition name: XXX=bdw|knl|skl
+#SBATCH --job-name=Cool              # job name
+#SBATCH --error=%J.err    # stderr file
+#SBATCH --output=%J.out   # stdout file
+echo "Job started at " `date`
+module load gnu
+rm -f Cooling.exe
+gcc -pg -o Cooling.exe -O3 Cooling.c  -lm
+rm -f FieldValues0???.ppm FieldValues0???.jpg
+./Cooling.exe >& Cooling_c.log
+wait
+rm -f Cooling.exe
+gfortran -pg -o Cooling.exe -O3 Cooling.f90  -lm
+rm -f FieldValues0???.ppm FieldValues0???.jpg
+./Cooling.exe >& Cooling_f90.log
+wait
+echo "Job finished at " `date`
+exit
