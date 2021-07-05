@@ -169,9 +169,13 @@ struct i2dGrid* copyi2dGridInitialization(struct i2dGrid hostStruct) {
 
 	HANDLE_ERROR(cudaMalloc((void**) &deviceStruct, sizeof(hostStruct)));
   	HANDLE_ERROR(cudaMemcpy( deviceStruct, &hostStruct, sizeof(struct i2dGrid), cudaMemcpyHostToDevice ));
-	HANDLE_ERROR(cudaMalloc((void**) &deviceValues, sizeof(int) * hostStruct.EX * hostStruct.EY ));
-	//deviceStruct->Values = deviceValues;
-  //deviceValues[0] = 1;
+
+	int size_of_values = sizeof(int) * hostStruct.EX * hostStruct.EY;
+	HANDLE_ERROR(cudaMalloc((void**) &deviceValues, size_of_values ));
+	HANDLE_ERROR(cudaMemcpy( deviceStruct->Values, deviceValues, size_of_values, cudaMemcpyDeviceToDevice));
+	// instead of 
+	// deviceStruct->Values = deviceValues;
+	// use cudaMemcpy Device to Device
 	
   return deviceStruct;
 }
@@ -180,9 +184,9 @@ void copyBacki2dGridToHost(struct i2dGrid* deviceStruct, struct i2dGrid hostStru
   /**
   * Copia tutto quello che c'è in deviceStruct all'interno di hostStruct
   */
-  HANDLE_ERROR(cudaMemcpy(&hostStruct, deviceStruct, 
-            sizeof(struct i2dGrid) + (sizeof(int) * hostStruct.EX * hostStruct.EY ), 
-            cudaMemcpyDeviceToHost ));
+	HANDLE_ERROR(cudaMemcpy(&hostStruct, deviceStruct, sizeof(struct i2dGrid), cudaMemcpyDeviceToHost ));
+	int size_of_values = sizeof(int) * hostStruct.EX * hostStruct.EY;
+	HANDLE_ERROR(cudaMemcpy(hostStruct.Values, deviceStruct->Values, size_of_values, cudaMemcpyDeviceToHost));
 }
 
 
