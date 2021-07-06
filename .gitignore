@@ -53,3 +53,9 @@ dkms.conf
 
 # MacOS files
 .DS_Store
+
+# File for particles application
+.dmp
+.sta
+.jpg
+.ppm

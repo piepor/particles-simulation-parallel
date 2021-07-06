@@ -157,27 +157,16 @@ void ForceCompt(double *f, struct particle p1, struct particle p2);
 // CUDA kernel
 // void GeneratingField(struct i2dGrid *grid, int MaxIt);
 
-
-struct i2dGrid* copyi2dGridInitialization(struct i2dGrid hostStruct) {
+void copyi2dGridInitialization(struct i2dGrid hostStruct, struct i2dGrid* deviceStruct, int* deviceValues) {
   /**
   * Copia i valori di inizializzazione di hostStruct, tralasciando ciò che si
   * trova nella matrice, in una nuova struttura nel device. Restituisce un puntatore
   * alla nuova matrice sul device.
   */
-	struct i2dGrid* deviceStruct;
-	int* deviceValues;
 
 	HANDLE_ERROR(cudaMalloc((void**) &deviceStruct, sizeof(hostStruct)));
   	HANDLE_ERROR(cudaMemcpy( deviceStruct, &hostStruct, sizeof(struct i2dGrid), cudaMemcpyHostToDevice ));
-
-	int size_of_values = sizeof(int) * hostStruct.EX * hostStruct.EY;
-	HANDLE_ERROR(cudaMalloc((void**) &deviceValues, size_of_values ));
-	HANDLE_ERROR(cudaMemcpy( deviceStruct->Values, deviceValues, size_of_values, cudaMemcpyDeviceToDevice));
-	// instead of 
-	// deviceStruct->Values = deviceValues;
-	// use cudaMemcpy Device to Device
-	
-  return deviceStruct;
+	HANDLE_ERROR(cudaMalloc((void**) &deviceValues, sizeof(int) * hostStruct.EX * hostStruct.EY ));
 }
 
 void copyBacki2dGridToHost(struct i2dGrid* deviceStruct, struct i2dGrid hostStruct) {
@@ -451,7 +440,7 @@ void InitGrid(char *InputFile) {
 	return;
 }
 // end InitGrid
-__global__ void GeneratingField(struct i2dGrid *grid, int MaxIt) {
+__global__ void GeneratingField(struct i2dGrid *grid, int* values, int MaxIt) {
 	/*
    !  Compute "generating" points 
    !  Output:
@@ -467,6 +456,7 @@ __global__ void GeneratingField(struct i2dGrid *grid, int MaxIt) {
 	//fprintf(stdout, "Computing generating field ...\n");
 	Xdots = grid->EX;
 	Ydots = grid->EY;
+  printf("ciao");
 	// numero di intersezioni lungo X e Y
 	Sr = grid->Xe - grid->Xs;
 	// distanza tra i punti della griglia lungo X
@@ -506,7 +496,7 @@ __global__ void GeneratingField(struct i2dGrid *grid, int MaxIt) {
 		//if (izmx < iz) izmx=iz;
 		if (iz >= MaxIt)
 		            iz = 0;
-		grid->Values[index2D(ix, iy, offset)] = iz;
+		values[index2D(ix, iy, offset)] = iz;
 	}
 	return;
 }
@@ -821,9 +811,11 @@ int main(int argc, char *argv[]) /* FinalApplication */ {
 	
 	// 	copia valori di InitGrid su GPU e alloca spazio per le matrici
 	printf("Copy to device...\n");
-	struct i2dGrid* GenFieldGrid_dev = copyi2dGridInitialization(GenFieldGrid);
+	struct i2dGrid* GenFieldGrid_dev;
+  int *deviceValues;
+  copyi2dGridInitialization(GenFieldGrid, GenFieldGrid_dev, deviceValues);
 	printf("Copy to device 2...\n");
-	struct i2dGrid* ParticleGrid_dev = copyi2dGridInitialization(ParticleGrid);
+	//struct i2dGrid* ParticleGrid_dev = copyi2dGridInitialization(ParticleGrid);
 
 
 	// GenFieldGrid initialization
@@ -832,9 +824,12 @@ int main(int argc, char *argv[]) /* FinalApplication */ {
   dim3 dimBlock (TILE_WIDTH, TILE_WIDTH);
   dim3 dimGrid ((GenFieldGrid.EX-1)/TILE_WIDTH+1, (GenFieldGrid.EX-1)/TILE_WIDTH+1);
 	//GeneratingField(&GenFieldGrid, MaxIters);
-  GeneratingField<<<dimGrid, dimBlock>>>(GenFieldGrid_dev, MaxIters);
-  copyBacki2dGridToHost(GenFieldGrid_dev, GenFieldGrid);
+  GeneratingField<<<dimGrid, dimBlock>>>(GenFieldGrid_dev, deviceValues, MaxIters);
+  cudaFree(GenFieldGrid_dev);
+  cudaFree(deviceValues);
+  //copyBacki2dGridToHost(GenFieldGrid_dev, GenFieldGrid);
 	// Particle population initialization
+  /*
 	printf("ParticleGeneration...\n");
 
   ParticleGeneration(GenFieldGrid, ParticleGrid, &Particles);
@@ -845,6 +840,7 @@ int main(int argc, char *argv[]) /* FinalApplication */ {
 	time(&t1);
 	fprintf(stdout, "Ending   at: %s", asctime(localtime(&t1)));
 	fprintf(stdout, "Computations ended in %lf seconds\n", difftime(t1, t0));
+  */
 	fprintf(stdout, "End of program!\n");
 	return (0);
 }
