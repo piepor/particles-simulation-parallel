@@ -165,19 +165,19 @@ void copyi2dGridInitialization(struct i2dGrid hostStruct, struct i2dGrid* device
   */
 
 	HANDLE_ERROR(cudaMalloc((void**) &deviceStruct, sizeof(hostStruct)));
-  	HANDLE_ERROR(cudaMemcpy( deviceStruct, &hostStruct, sizeof(struct i2dGrid), cudaMemcpyHostToDevice ));
+  HANDLE_ERROR(cudaMemcpy( deviceStruct, &hostStruct, sizeof(struct i2dGrid), cudaMemcpyHostToDevice ));
 	HANDLE_ERROR(cudaMalloc((void**) &deviceValues, sizeof(int) * hostStruct.EX * hostStruct.EY ));
 }
 
-void copyBacki2dGridToHost(struct i2dGrid* deviceStruct, struct i2dGrid hostStruct) {
+void copyBacki2dGridToHost(struct i2dGrid hostStruct, struct i2dGrid* deviceStruct, int* deviceValues) {
   /**
   * Copia tutto quello che c'è in deviceStruct all'interno di hostStruct
   */
-	HANDLE_ERROR(cudaMemcpy(&hostStruct, deviceStruct, sizeof(struct i2dGrid), cudaMemcpyDeviceToHost ));
-	int size_of_values = sizeof(int) * hostStruct.EX * hostStruct.EY;
-	HANDLE_ERROR(cudaMemcpy(hostStruct.Values, deviceStruct->Values, size_of_values, cudaMemcpyDeviceToHost));
+  printf("size grid %d\n", sizeof(struct i2dGrid));
+  printf("size grid %d\n", sizeof(hostStruct));
+	//HANDLE_ERROR(cudaMemcpy(&hostStruct, deviceStruct, sizeof(struct i2dGrid), cudaMemcpyDeviceToHost ));
+  HANDLE_ERROR(cudaMemcpy(hostStruct.Values, deviceValues, sizeof(int) * hostStruct.EX * hostStruct.EY, cudaMemcpyDeviceToHost));
 }
-
 
 void newparticle(struct particle *p, double weight, double x, double y, double vx, double vy) {
 	/*
@@ -456,7 +456,6 @@ __global__ void GeneratingField(struct i2dGrid *grid, int* values, int MaxIt) {
 	//fprintf(stdout, "Computing generating field ...\n");
 	Xdots = grid->EX;
 	Ydots = grid->EY;
-  printf("ciao");
 	// numero di intersezioni lungo X e Y
 	Sr = grid->Xe - grid->Xs;
 	// distanza tra i punti della griglia lungo X
@@ -496,7 +495,8 @@ __global__ void GeneratingField(struct i2dGrid *grid, int* values, int MaxIt) {
 		//if (izmx < iz) izmx=iz;
 		if (iz >= MaxIt)
 		            iz = 0;
-		values[index2D(ix, iy, offset)] = iz;
+		//values[index2D(ix, iy, offset)] = iz;
+		values[ix + iy * offset] = iz;
 	}
 	return;
 }
@@ -813,7 +813,11 @@ int main(int argc, char *argv[]) /* FinalApplication */ {
 	printf("Copy to device...\n");
 	struct i2dGrid* GenFieldGrid_dev;
   int *deviceValues;
-  copyi2dGridInitialization(GenFieldGrid, GenFieldGrid_dev, deviceValues);
+  int *adcazzum;
+  adcazzum = (int*) malloc(sizeof(int)*GenFieldGrid.EX * GenFieldGrid.EY);
+  cudaMalloc((void**) &deviceValues, sizeof(int)*GenFieldGrid.EX * GenFieldGrid.EY);
+  cudaMalloc((void**) &GenFieldGrid_dev, sizeof(struct i2dGrid));
+  //copyi2dGridInitialization(GenFieldGrid, GenFieldGrid_dev, deviceValues);
 	printf("Copy to device 2...\n");
 	//struct i2dGrid* ParticleGrid_dev = copyi2dGridInitialization(ParticleGrid);
 
@@ -824,10 +828,28 @@ int main(int argc, char *argv[]) /* FinalApplication */ {
   dim3 dimBlock (TILE_WIDTH, TILE_WIDTH);
   dim3 dimGrid ((GenFieldGrid.EX-1)/TILE_WIDTH+1, (GenFieldGrid.EX-1)/TILE_WIDTH+1);
 	//GeneratingField(&GenFieldGrid, MaxIters);
+  for (int i = 0; i<GenFieldGrid.EX*GenFieldGrid.EY; i++ )
+    adcazzum[i] = 0;
+  //GeneratingField<<<dimGrid, dimBlock>>>(GenFieldGrid_dev, deviceValues, MaxIters);
+  //copyBacki2dGridToHost(GenFieldGrid, GenFieldGrid_dev, deviceValues);
+  printf("EX %d\n", GenFieldGrid.EX);
+  printf("EY %d\n", GenFieldGrid.EY);
+  HANDLE_ERROR(cudaMemcpy(deviceValues, adcazzum, sizeof(int) * 2400 * 2000, cudaMemcpyHostToDevice));
+  HANDLE_ERROR(cudaMemcpy(GenFieldGrid_dev, &GenFieldGrid, sizeof(struct i2dGrid), cudaMemcpyHostToDevice));
   GeneratingField<<<dimGrid, dimBlock>>>(GenFieldGrid_dev, deviceValues, MaxIters);
+  cudaError_t err = cudaGetLastError();
+  if (err != cudaSuccess)
+    printf("CUDA error: %s\n", cudaGetErrorString(err));
+  HANDLE_ERROR(cudaMemcpy(adcazzum, deviceValues, sizeof(int) * 2400 * 2000, cudaMemcpyDeviceToHost));
   cudaFree(GenFieldGrid_dev);
   cudaFree(deviceValues);
-  //copyBacki2dGridToHost(GenFieldGrid_dev, GenFieldGrid);
+  int i=0;
+  while (adcazzum[i] == 0)
+  {
+    i++;
+  }
+  printf("Found %d in generated field at %d \n", adcazzum[i], i);
+
 	// Particle population initialization
   /*
 	printf("ParticleGeneration...\n");
