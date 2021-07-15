@@ -795,6 +795,14 @@ int main( int argc, char *argv[])    /* FinalApplication */
    // GenFieldGrid initialization
    printf("GeneratingField...\n");
    GeneratingField(&GenFieldGrid,MaxIters);
+   int j=0;
+   for (int i = 0; i<GenFieldGrid.EX*GenFieldGrid.EY; i++ )
+   {
+     if (GenFieldGrid.Values[i] != 0)
+       j++;
+   }
+   printf("%d particles in the field\n", j);
+
 
    // Particle population initialization
    printf("ParticleGeneration...\n");
