@@ -488,7 +488,6 @@ void GeneratingField(struct i2dGrid *grid, int MaxIt)
    }
    return;
 } // end GeneratingField
-/*
 __global__ void GeneratingField(struct i2dGrid *grid, int* values, int MaxIt) {
 	/*
    !  Compute "generating" points 
