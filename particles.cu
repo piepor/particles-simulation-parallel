@@ -820,28 +820,55 @@ int main( int argc, char *argv[])    /* FinalApplication */
    
    // COMPUTATION ON THE GPU
    // Compute evolution of the particle population
-   printf("Malloc data on the GPU...\n");
+   printf("Malloc data on the device...\n");
    // For the part of pure computation only need particles' weigth, position and velocity
    double *posX_dev;
    double *posY_dev;
    double *velX_dev;
    double *velY_dev;
    double *weight_dev;
+   double *TimeBit_dev;
    HANDLE_ERROR(cudaMalloc((void**) &posX_dev, sizeof(double)*Particles.np));
    HANDLE_ERROR(cudaMalloc((void**) &posY_dev, sizeof(double)*Particles.np));
    HANDLE_ERROR(cudaMalloc((void**) &velX_dev, sizeof(double)*Particles.np));
    HANDLE_ERROR(cudaMalloc((void**) &velY_dev, sizeof(double)*Particles.np));
    HANDLE_ERROR(cudaMalloc((void**) &weight_dev, sizeof(double)*Particles.np));
+   HANDLE_ERROR(cudaMalloc((void**) &TimeBit_dev, sizeof(double)));
    
-   printf("Copy data on the GPU...\n");
+   printf("Copy data on the device...\n");
    HANDLE_ERROR(cudaMemcpy(posX_dev, Particles.x, sizeof(double)*Particles.np, cudaMemcpyHostToDevice));
-   HANDLE_ERROR(cudaMemcpy(posX_dev, Particles.y, sizeof(double)*Particles.np, cudaMemcpyHostToDevice));
-   HANDLE_ERROR(cudaMemcpy(posX_dev, Particles.vx, sizeof(double)*Particles.np, cudaMemcpyHostToDevice));
-   HANDLE_ERROR(cudaMemcpy(posX_dev, Particles.vy, sizeof(double)*Particles.np, cudaMemcpyHostToDevice));
-   HANDLE_ERROR(cudaMemcpy(posX_dev, Particles.weight, sizeof(double)*Particles.np, cudaMemcpyHostToDevice));
+   HANDLE_ERROR(cudaMemcpy(posY_dev, Particles.y, sizeof(double)*Particles.np, cudaMemcpyHostToDevice));
+   HANDLE_ERROR(cudaMemcpy(velX_dev, Particles.vx, sizeof(double)*Particles.np, cudaMemcpyHostToDevice));
+   HANDLE_ERROR(cudaMemcpy(velY_dev, Particles.vy, sizeof(double)*Particles.np, cudaMemcpyHostToDevice));
+   HANDLE_ERROR(cudaMemcpy(weight_dev, Particles.weight, sizeof(double)*Particles.np, cudaMemcpyHostToDevice));
+   HANDLE_ERROR(cudaMemcpy(TimeBit_dev, &TimeBit, sizeof(double), cudaMemcpyHostToDevice));
 
    printf("SystemEvolution...\n");
    //SystemEvolution(&ParticleGrid, &Particles, MaxSteps);
+
+   printf("Copy back to host...\n");
+   HANDLE_ERROR(cudaMemcpy(Particles.x, posX_dev, sizeof(double)*Particles.np, cudaMemcpyDeviceToHost));
+   HANDLE_ERROR(cudaMemcpy(Particles.y, posY_dev, sizeof(double)*Particles.np, cudaMemcpyDeviceToHost));
+   HANDLE_ERROR(cudaMemcpy(Particles.vx, velX_dev, sizeof(double)*Particles.np, cudaMemcpyDeviceToHost));
+   HANDLE_ERROR(cudaMemcpy(Particles.vy, velY_dev, sizeof(double)*Particles.np, cudaMemcpyDeviceToHost));
+   HANDLE_ERROR(cudaMemcpy(Particles.weight, weight_dev, sizeof(double)*Particles.np, cudaMemcpyDeviceToHost));
+
+   printf("Free device memory...\n");
+	 HANDLE_ERROR(cudaFree(posX_dev));
+	 HANDLE_ERROR(cudaFree(posY_dev));
+	 HANDLE_ERROR(cudaFree(velX_dev));
+	 HANDLE_ERROR(cudaFree(velY_dev));
+	 HANDLE_ERROR(cudaFree(weight_dev));
+	 HANDLE_ERROR(cudaFree(TimeBit_dev));
+
+   printf("Free host memory...\n");
+	 free(GenFieldGrid.Values);
+	 free(ParticleGrid.Values);
+	 free(Particles.x);
+	 free(Particles.y);
+	 free(Particles.vx);
+	 free(Particles.vy);
+	 free(Particles.weight);
    
    time(&t1);
    fprintf(stdout,"Ending   at: %s", asctime(localtime(&t1)));
@@ -851,6 +878,5 @@ int main( int argc, char *argv[])    /* FinalApplication */
 
    return(0);
 }  // end FinalApplication
-
 
 
