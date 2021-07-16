@@ -532,10 +532,10 @@ __global__ void ForceCompt_par(double *f, double *x, double *y, double *weight, 
 		{
 			if (i != tid)
 			{
-				dx = p2.x - p1.x; dy = p2.y - p1.y;
+				dx = x[i] - x[tid]; dy = y[i] - y[tid];
 				d2 = dx*dx + dy*dy;  // what if particles get in touch? Simply avoid the case
 				if ( d2 < tiny ) d2 = tiny;
-				force = (k * p1.weight * p2.weight) / d2;
+				force = (k * weight[tid] * weight[i]) / d2;
 				fx = force * dx / sqrt(d2); fy = force * dy / sqrt(d2);
 				f[0 + tid*2] = f[0 + tid*2] + fx;
 				f[1 + tid*2] = f[1 + tid*2] + fx;
@@ -830,6 +830,10 @@ int main( int argc, char *argv[])    /* FinalApplication */
 {
 #include <time.h>
    time_t t0, t1;
+	 int TILE_WIDTH = 32;
+	 //dim3 dimBlock (TILE_WIDTH, TILE_WIDTH);
+	 //dim3 dimGrid ((GenFieldGrid.EX-1)/TILE_WIDTH+1, (GenFieldGrid.EX-1)/TILE_WIDTH+1);
+	 const int dimBlock = TILE_WIDTH;
    
    time(&t0);
    fprintf(stdout,"Starting at: %s", asctime(localtime(&t0)));
@@ -886,10 +890,27 @@ int main( int argc, char *argv[])    /* FinalApplication */
 
    printf("SystemEvolution...\n");
    //SystemEvolution(&ParticleGrid, &Particles, MaxSteps);
-	 for (i=0; i<MaxSteps; i++) {
-		 ForceCompt_par;
-		 ComptPopulation_par;
-		 sync_threads;
+	 double f[2];
+	 double *forces;
+	 struct particle p1, p2;
+	 for (int k=0; k<MaxSteps; k++) {
+		 int N = Particles.np;
+		 int dimGrid = (N-1)/TILE_WIDTH+1;
+		 //ForceCompt_par<<<dimGrid, dimBlock>>>(forces_dev, posX_dev, posY_dev, weight_dev, Particles.np);
+     forces = (double*) malloc(2 * Particles.np * sizeof((double)1.0));
+		 for (int i=0; i < Particles.np; i++ ) {
+            newparticle(&p1,Particles.weight[i],Particles.x[i],Particles.y[i],Particles.vx[i],Particles.vy[i]);
+			for (int j=0; j < Particles.np; j++ ) {
+				if ( j != i ) {
+                 newparticle(&p2,Particles.weight[j],Particles.x[j],Particles.y[j],Particles.vx[j],Particles.vy[j]);
+				 ForceCompt(f,p1,p2);
+				 forces[index2D(0,i,2)] = forces[index2D(0,i,2)] + f[0];
+				 forces[index2D(1,i,2)] = forces[index2D(1,i,2)] + f[1];
+				};
+			};
+		 };
+		 //ComptPopulation_par;
+		 //sync_threads;
 	 };
 
    printf("Copy back to host...\n");
