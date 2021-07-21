@@ -55,7 +55,7 @@ dkms.conf
 .DS_Store
 
 # File for particles application
-.dmp
-.sta
-.jpg
-.ppm
+*.dmp
+*.sta
+*.jpg
+*.ppm
