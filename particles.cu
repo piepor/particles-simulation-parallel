@@ -538,10 +538,40 @@ __global__ void ForceCompt_par(double *f, double *x, double *y, double *weight, 
 				force = (k * weight[tid] * weight[i]) / d2;
 				fx = force * dx / sqrt(d2); fy = force * dy / sqrt(d2);
 				f[0 + tid*2] = f[0 + tid*2] + fx;
-				f[1 + tid*2] = f[1 + tid*2] + fx;
+				f[1 + tid*2] = f[1 + tid*2] + fy;
 			}
 		}
 	}
+}
+
+__global__ void ComptPopulation_par(double *x, double *y, double *vx, double *vy, double *f, double *weight, int np, int TimeBit)
+{
+	/*
+	 * compute effects of forces on particles in a interval time
+	 * 
+	*/
+	int i;
+	int tid = blockIdx.x * blockDim.x + threadIdx.x;
+	//double x0, x1, y0, y1;
+	if (tid < np){
+		x[tid] = x[tid] + vx[tid]*TimeBit + 0.5*f[0 + tid*2]*TimeBit*TimeBit/weight[tid];
+		vx[tid] = vx[tid] + f[0 + tid*2]*TimeBit/weight[tid];
+		y[tid] = y[tid] + vy[tid]*TimeBit + 0.5*f[1 + tid*2]*TimeBit*TimeBit/weight[tid];
+		vy[tid] = vy[tid] + f[1 + tid*2]*TimeBit/weight[tid];
+	}
+	
+//	for ( i = 0; i < p->np; i++ ) {
+//		//x0 = p->x[i]; y0 = p->y[i]; 
+//				
+//		p->x[i] = p->x[i] + (p->vx[i]*TimeBit) + 
+//		     (0.5*forces[index2D(0,i,2)]*TimeBit*TimeBit/p->weight[i]);
+//		p->vx[i] = p->vx[i] + forces[index2D(0,i,2)]*TimeBit/p->weight[i];
+//
+//		p->y[i] = p->y[i] + (p->vy[i]*TimeBit) + 
+//		     (0.5*forces[index2D(1,i,2)]*TimeBit*TimeBit/p->weight[i]);		
+//		p->vy[i] = p->vy[i] + forces[index2D(1,i,2)]*TimeBit/p->weight[i];
+//
+//	}
 }
 
 void ComptPopulation(struct Population *p, double *forces)
@@ -896,23 +926,26 @@ int main( int argc, char *argv[])    /* FinalApplication */
 	 for (int k=0; k<MaxSteps; k++) {
 		 int N = Particles.np;
 		 int dimGrid = (N-1)/TILE_WIDTH+1;
-		 //ForceCompt_par<<<dimGrid, dimBlock>>>(forces_dev, posX_dev, posY_dev, weight_dev, Particles.np);
-     forces = (double*) malloc(2 * Particles.np * sizeof((double)1.0));
-		 for (int i=0; i < Particles.np; i++ ) {
-            newparticle(&p1,Particles.weight[i],Particles.x[i],Particles.y[i],Particles.vx[i],Particles.vy[i]);
-			for (int j=0; j < Particles.np; j++ ) {
-				if ( j != i ) {
-                 newparticle(&p2,Particles.weight[j],Particles.x[j],Particles.y[j],Particles.vx[j],Particles.vy[j]);
-				 ForceCompt(f,p1,p2);
-				 forces[index2D(0,i,2)] = forces[index2D(0,i,2)] + f[0];
-				 forces[index2D(1,i,2)] = forces[index2D(1,i,2)] + f[1];
-				};
-			};
-		 };
-		 //ComptPopulation_par;
+		 ForceCompt_par<<<dimGrid, dimBlock>>>(forces_dev, posX_dev, posY_dev, weight_dev, Particles.np);
+//     forces = (double*) malloc(2 * Particles.np * sizeof((double)1.0));
+//		 for (int i=0; i < Particles.np; i++ ) {
+//            newparticle(&p1,Particles.weight[i],Particles.x[i],Particles.y[i],Particles.vx[i],Particles.vy[i]);
+//			for (int j=0; j < Particles.np; j++ ) {
+//				if ( j != i ) {
+//                 newparticle(&p2,Particles.weight[j],Particles.x[j],Particles.y[j],Particles.vx[j],Particles.vy[j]);
+//				 ForceCompt(f,p1,p2);
+//				 forces[index2D(0,i,2)] = forces[index2D(0,i,2)] + f[0];
+//				 forces[index2D(1,i,2)] = forces[index2D(1,i,2)] + f[1];
+//				};
+//			};
+//		 };
+//		 ComptPopulation(&Particles, forces);
+		 ComptPopulation_par<<<dimGrid, dimBlock>>>(posX_dev, posY_dev, velX_dev, velY_dev, forces_dev, weight_dev, Particles.np, TimeBit);
 		 //sync_threads;
+		 fprintf(stdout,"Step %d of %d\n",k+1,MaxSteps);
 	 };
 
+	 HANDLE_ERROR(cudaDeviceSynchronize());
    printf("Copy back to host...\n");
    HANDLE_ERROR(cudaMemcpy(Particles.x, posX_dev, sizeof(double)*Particles.np, cudaMemcpyDeviceToHost));
    HANDLE_ERROR(cudaMemcpy(Particles.y, posY_dev, sizeof(double)*Particles.np, cudaMemcpyDeviceToHost));
