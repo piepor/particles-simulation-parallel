@@ -73,23 +73,29 @@ void print_Population(struct Population p)
 
 void DumpPopulation(struct Population p, int t)
 {
-   /*
-    * save population values on file 
-   */	
-   char fname[80];
-   FILE *dump;
-   
-   sprintf(fname,"Population%4.4d.dmp\0",t);
-   dump = fopen(fname,"w");
-   if ( dump == NULL ) {
-	  fprintf(stderr,"Error write open file %s\n",fname);
-	  exit(1);
-   }
-   fwrite(&p.np,sizeof((int)1),1,dump);
-   fwrite(p.weight,sizeof((double)1.0),p.np,dump);
-   fwrite(p.x,sizeof((double)1.0),p.np,dump);
-   fwrite(p.y,sizeof((double)1.0),p.np,dump);
-   fclose(dump);
+    /*
+     * save population values on file
+    */
+    char fname[80];
+    FILE *dump;
+
+    sprintf(fname,"Population%4.4d.dmp\0",t);
+    dump = fopen(fname,"wt");
+    if ( dump == NULL ) {
+        fprintf(stderr,"Error write open file %s\n",fname);
+        exit(1);
+    }
+    // sostituisco fwrite con fprintf che scrive righe di testo
+    /*fwrite(&p.np,sizeof((int)1),1,dump);
+    fwrite(p.weight,sizeof((double)1.0),p.np,dump);
+    fwrite(p.x,sizeof((double)1.0),p.np,dump);
+    fwrite(p.y,sizeof((double)1.0),p.np,dump);*/
+    fprintf(dump,"np: %d\n", p.np);
+    fprintf(dump, "ith\tweight\tx\ty\n");
+    for(int i=0; i<p.np; i++) {
+        fprintf(dump, "%d\t%lf\t%lf\t%lf\n", i, p.weight[i], p.x[i], p.y[i]);
+    }
+    fclose(dump);
 }
 
 void ParticleStats(struct Population p, int t)
