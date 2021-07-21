@@ -81,23 +81,29 @@ void print_Population(struct Population p)
 
 void DumpPopulation(struct Population p, int t)
 {
-   /*
-    * save population values on file 
-   */	
-   char fname[80];
-   FILE *dump;
-   
-   sprintf(fname,"Population%4.4d.dmp\0",t);
-   dump = fopen(fname,"w");
-   if ( dump == NULL ) {
-	  fprintf(stderr,"Error write open file %s\n",fname);
-	  exit(1);
-   }
-   fwrite(&p.np,sizeof((int)1),1,dump);
-   fwrite(p.weight,sizeof((double)1.0),p.np,dump);
-   fwrite(p.x,sizeof((double)1.0),p.np,dump);
-   fwrite(p.y,sizeof((double)1.0),p.np,dump);
-   fclose(dump);
+    /*
+     * save population values on file
+    */
+    char fname[80];
+    FILE *dump;
+
+    sprintf(fname,"Population%4.4d.dmp\0",t);
+    dump = fopen(fname,"wt");
+    if ( dump == NULL ) {
+        fprintf(stderr,"Error write open file %s\n",fname);
+        exit(1);
+    }
+    // sostituisco fwrite con fprintf che scrive righe di testo
+    /*fwrite(&p.np,sizeof((int)1),1,dump);
+    fwrite(p.weight,sizeof((double)1.0),p.np,dump);
+    fwrite(p.x,sizeof((double)1.0),p.np,dump);
+    fwrite(p.y,sizeof((double)1.0),p.np,dump);*/
+    fprintf(dump,"np: %d\n", p.np);
+    fprintf(dump, "ith\tweight\tx\ty\n");
+    for(int i=0; i<p.np; i++) {
+        fprintf(dump, "%d\t%lf\t%lf\t%lf\n", i, p.weight[i], p.x[i], p.y[i]);
+    }
+    fclose(dump);
 }
 
 void ParticleStats(struct Population p, int t)
@@ -907,7 +913,6 @@ int main( int argc, char *argv[])    /* FinalApplication */
 	 // allocate space for the force array
    HANDLE_ERROR(cudaMalloc((void**) &forces_dev, 2*sizeof(double)*Particles.np));
 	 // init forces to 0
-	 HANDLE_ERROR(cudaMemset(forces_dev, 0, 2*sizeof(double)*Particles.np));
 
    
    printf("Copy data on the device...\n");
@@ -923,29 +928,31 @@ int main( int argc, char *argv[])    /* FinalApplication */
 	 double f[2];
 	 double *forces;
 	 struct particle p1, p2;
+	 forces = (double*) malloc(2 * Particles.np * sizeof((double)1.0));
 	 for (int k=0; k<MaxSteps; k++) {
 		 int N = Particles.np;
 		 int dimGrid = (N-1)/TILE_WIDTH+1;
-		 ForceCompt_par<<<dimGrid, dimBlock>>>(forces_dev, posX_dev, posY_dev, weight_dev, Particles.np);
-//     forces = (double*) malloc(2 * Particles.np * sizeof((double)1.0));
-//		 for (int i=0; i < Particles.np; i++ ) {
-//            newparticle(&p1,Particles.weight[i],Particles.x[i],Particles.y[i],Particles.vx[i],Particles.vy[i]);
-//			for (int j=0; j < Particles.np; j++ ) {
-//				if ( j != i ) {
-//                 newparticle(&p2,Particles.weight[j],Particles.x[j],Particles.y[j],Particles.vx[j],Particles.vy[j]);
-//				 ForceCompt(f,p1,p2);
-//				 forces[index2D(0,i,2)] = forces[index2D(0,i,2)] + f[0];
-//				 forces[index2D(1,i,2)] = forces[index2D(1,i,2)] + f[1];
-//				};
-//			};
-//		 };
-//		 ComptPopulation(&Particles, forces);
-		 ComptPopulation_par<<<dimGrid, dimBlock>>>(posX_dev, posY_dev, velX_dev, velY_dev, forces_dev, weight_dev, Particles.np, TimeBit);
-		 //sync_threads;
+//     HANDLE_ERROR(cudaMemset(forces_dev, 0, 2*sizeof(double)*Particles.np));
+//		 ForceCompt_par<<<dimGrid, dimBlock>>>(forces_dev, posX_dev, posY_dev, weight_dev, Particles.np);
+//		 ComptPopulation_par<<<dimGrid, dimBlock>>>(posX_dev, posY_dev, velX_dev, velY_dev, forces_dev, weight_dev, Particles.np, TimeBit);
+//		 HANDLE_ERROR(cudaDeviceSynchronize());
+		 DumpPopulation(Particles, k);
+		 memset(forces, 0, 2 * Particles.np * sizeof(double));
+		 for (int i=0; i < Particles.np; i++ ) {
+            newparticle(&p1,Particles.weight[i],Particles.x[i],Particles.y[i],Particles.vx[i],Particles.vy[i]);
+			for (int j=0; j < Particles.np; j++ ) {
+				if ( j != i ) {
+					newparticle(&p2,Particles.weight[j],Particles.x[j],Particles.y[j],Particles.vx[j],Particles.vy[j]);
+					ForceCompt(f,p1,p2);
+					forces[index2D(0,i,2)] = forces[index2D(0,i,2)] + f[0];
+					forces[index2D(1,i,2)] = forces[index2D(1,i,2)] + f[1];
+				};
+			};
+		 };
+		 ComptPopulation(&Particles, forces);
 		 fprintf(stdout,"Step %d of %d\n",k+1,MaxSteps);
 	 };
 
-	 HANDLE_ERROR(cudaDeviceSynchronize());
    printf("Copy back to host...\n");
    HANDLE_ERROR(cudaMemcpy(Particles.x, posX_dev, sizeof(double)*Particles.np, cudaMemcpyDeviceToHost));
    HANDLE_ERROR(cudaMemcpy(Particles.y, posY_dev, sizeof(double)*Particles.np, cudaMemcpyDeviceToHost));
