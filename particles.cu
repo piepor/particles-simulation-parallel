@@ -62,24 +62,13 @@ struct particle {
 	   double weight, x, y, vx, vy, fx, fy;
 };
 
-void print_particle(struct particle p) 
-{
-	printf("particle: weight=%lf, x,y=(%lf,%lf), vx,vy=(%lf,%lf), fx,fy=(%lf,%lf)\n",
-	    p.weight, p.x, p.y, p.vx, p.vy, p.fx, p.fy);
-}
-
 struct Population
 {
 	int np;
 	double *weight, *x, *y, *vx, *vy; // particles have a position and few other properties
 } Particles;
-	
-void print_Population(struct Population p) 
-{
-	printf("Population: np = %d\n",p.np);
-}
 
-void DumpPopulation(struct Population p, int t)
+void DumpForces(double *forces, int t, int np, char *fileName)
 {
     /*
      * save population values on file
@@ -87,7 +76,28 @@ void DumpPopulation(struct Population p, int t)
     char fname[80];
     FILE *dump;
 
-    sprintf(fname,"Population%4.4d.dmp\0",t);
+    sprintf(fname,"%s%4.4d.dmp\0", fileName, t);
+    dump = fopen(fname,"wt");
+    if ( dump == NULL ) {
+        fprintf(stderr,"Error write open file %s\n",fname);
+        exit(1);
+    }
+    fprintf(dump, "ith\tFx\tFy\n");
+    for(int i=0; i<np; i++) {
+        fprintf(dump, "%d\t%lf\t%lf\n", i, forces[2*i+0], forces[2*i+1]);
+    }
+    fclose(dump);
+}
+
+void DumpPopulation(struct Population p, int t, char *fileName)
+{
+    /*
+     * save population values on file
+    */
+    char fname[80];
+    FILE *dump;
+
+    sprintf(fname,"%s%4.4d.dmp\0", fileName, t);
     dump = fopen(fname,"wt");
     if ( dump == NULL ) {
         fprintf(stderr,"Error write open file %s\n",fname);
@@ -106,39 +116,6 @@ void DumpPopulation(struct Population p, int t)
     fclose(dump);
 }
 
-void ParticleStats(struct Population p, int t)
-{
-	/*
-	 * write a file with statistics on population 
-	*/
-	
-   FILE *stats;
-   double w, xg, yg, wmin, wmax; 
-   int i;
-   
-   if ( t <= 0 ) stats = fopen("Population.sta","w"); 
-     else stats = fopen("Population.sta","a"); // append new data
-   if ( stats == NULL ) {
-	  fprintf(stderr,"Error append/open file Population.sta\n");
-	  exit(1);
-   }
-   w = xg = yg = 0.0;
-   wmin = wmax = p.weight[0];
-   for ( i = 0; i < p.np; i++ ) {
-	   if ( wmin > p.weight[i] ) wmin = p.weight[i];
-	   if ( wmax < p.weight[i] ) wmax = p.weight[i];
-	   w = w + p.weight[i];
-	   xg = xg + (p.weight[i] * p.x[i]);
-	   yg = yg + (p.weight[i] * p.y[i]);
-   }
-   xg = xg / w;  yg = yg / w;
-   fprintf(stats,"At iteration %d particles: %d; wmin, wmax = %lf, %lf;\n",
-               t,p.np,wmin,wmax);
-   fprintf(stats,"   total weight = %lf; CM = (%10.4lf,%10.4lf)\n",
-               w,xg,yg);
-   fclose(stats);	
-
-}
 
 #define index2D(i,j,LD1) i + ((j)*LD1)    // element position in 2-D arrays
 
@@ -514,18 +491,6 @@ void ForceCompt(double *f, struct particle p1, struct particle p2)
 	f[0] = force * dx / sqrt(d2); f[1] = force * dy / sqrt(d2);
 }
 
-//__host__ __device__ void ForceCompt_par(double *fx, double *fy, double x1, double y1, double x2, double y2, double weight1, double weight2)
-//{
-//	double force, d, d2, dx, dy;
-//	static double k=0.001, tiny=(double)1.0/(double)1000000.0;
-//	
-//	dx = p2.x - p1.x; dy = p2.y - p1.y;
-//	d2 = dx*dx + dy*dy;  // what if particles get in touch? Simply avoid the case
-//	if ( d2 < tiny ) d2 = tiny;
-//	force = (k * p1.weight * p2.weight) / d2;
-//	fx = force * dx / sqrt(d2); fy = force * dy / sqrt(d2);
-//}
-
 __global__ void ForceCompt_par(double *f, double *x, double *y, double *weight, int np)
 {
 	int tid = blockIdx.x * blockDim.x + threadIdx.x;
@@ -548,36 +513,6 @@ __global__ void ForceCompt_par(double *f, double *x, double *y, double *weight, 
 			}
 		}
 	}
-}
-
-__global__ void ComptPopulation_par(double *x, double *y, double *vx, double *vy, double *f, double *weight, int np, int TimeBit)
-{
-	/*
-	 * compute effects of forces on particles in a interval time
-	 * 
-	*/
-	int i;
-	int tid = blockIdx.x * blockDim.x + threadIdx.x;
-	//double x0, x1, y0, y1;
-	if (tid < np){
-		x[tid] = x[tid] + vx[tid]*TimeBit + 0.5*f[0 + tid*2]*TimeBit*TimeBit/weight[tid];
-		vx[tid] = vx[tid] + f[0 + tid*2]*TimeBit/weight[tid];
-		y[tid] = y[tid] + vy[tid]*TimeBit + 0.5*f[1 + tid*2]*TimeBit*TimeBit/weight[tid];
-		vy[tid] = vy[tid] + f[1 + tid*2]*TimeBit/weight[tid];
-	}
-	
-//	for ( i = 0; i < p->np; i++ ) {
-//		//x0 = p->x[i]; y0 = p->y[i]; 
-//				
-//		p->x[i] = p->x[i] + (p->vx[i]*TimeBit) + 
-//		     (0.5*forces[index2D(0,i,2)]*TimeBit*TimeBit/p->weight[i]);
-//		p->vx[i] = p->vx[i] + forces[index2D(0,i,2)]*TimeBit/p->weight[i];
-//
-//		p->y[i] = p->y[i] + (p->vy[i]*TimeBit) + 
-//		     (0.5*forces[index2D(1,i,2)]*TimeBit*TimeBit/p->weight[i]);		
-//		p->vy[i] = p->vy[i] + forces[index2D(1,i,2)]*TimeBit/p->weight[i];
-//
-//	}
 }
 
 void ComptPopulation(struct Population *p, double *forces)
@@ -603,45 +538,22 @@ void ComptPopulation(struct Population *p, double *forces)
 	}
 }
 
-void SystemEvolution(struct i2dGrid *pgrid, struct Population *pp, int mxiter)
+__global__ void ComptPopulation_par(double *x, double *y, double *vx, double *vy, double *f, double *weight, int np, double TimeBit)
 {
-    double *forces;
-    double vmin, vmax;
-	struct particle p1, p2;
-	double f[2];
-	int i, j, t;
-
-     // temporary array of forces 
-     forces = (double*) malloc(2 * pp->np * sizeof((double)1.0));
-     if ( forces == NULL ) {
-		 fprintf(stderr,"Error mem alloc of forces!\n");
-		 exit(1);
-	 }
-
-	 // compute forces acting on each particle step by step
-     for ( t=0; t < mxiter; t++ ) {
-		 fprintf(stdout,"Step %d of %d\n",t,mxiter);
-		 ParticleScreen(pgrid,*pp,t);
-		 // DumpPopulation call frequency may be changed
-		 if ( t%4 == 0 ) DumpPopulation(*pp,t);
-		 ParticleStats(*pp,t);
-         for ( i=0; i < 2*pp->np; i++ ) forces[i] = 0.0;
-		 for ( i=0; i < pp->np; i++ ) {
-            newparticle(&p1,pp->weight[i],pp->x[i],pp->y[i],pp->vx[i],pp->vy[i]);
-			for ( j=0; j < pp->np; j++ ) {
-				if ( j != i ) {
-                 newparticle(&p2,pp->weight[j],pp->x[j],pp->y[j],pp->vx[j],pp->vy[j]);
-				 ForceCompt(f,p1,p2);
-				 forces[index2D(0,i,2)] = forces[index2D(0,i,2)] + f[0];
-				 forces[index2D(1,i,2)] = forces[index2D(1,i,2)] + f[1];
-				}
-			 }			 
-		 }
-		 ComptPopulation(pp,forces);
-	 }
-	 free(forces);     
-     
-}   // end SystemEvolution
+	/*
+	 * compute effects of forces on particles in a interval time
+	 * 
+	*/
+	int i;
+	int tid = blockIdx.x * blockDim.x + threadIdx.x;
+	//double x0, x1, y0, y1;
+	if (tid < np){
+		x[tid] = x[tid] + vx[tid]*TimeBit + 0.5*f[0 + tid*2]*TimeBit*TimeBit/weight[tid];
+		vx[tid] = vx[tid] + f[0 + tid*2]*TimeBit/weight[tid];
+		y[tid] = y[tid] + vy[tid]*TimeBit + 0.5*f[1 + tid*2]*TimeBit*TimeBit/weight[tid];
+		vy[tid] = vy[tid] + f[1 + tid*2]*TimeBit/weight[tid];
+	}
+}
 
 void ParticleScreen(struct i2dGrid* pgrid, struct Population pp, int step) 
 {
@@ -903,13 +815,11 @@ int main( int argc, char *argv[])    /* FinalApplication */
    double *velY_dev;
    double *weight_dev;
 	 double *forces_dev;
-   double *TimeBit_dev;
    HANDLE_ERROR(cudaMalloc((void**) &posX_dev, sizeof(double)*Particles.np));
    HANDLE_ERROR(cudaMalloc((void**) &posY_dev, sizeof(double)*Particles.np));
    HANDLE_ERROR(cudaMalloc((void**) &velX_dev, sizeof(double)*Particles.np));
    HANDLE_ERROR(cudaMalloc((void**) &velY_dev, sizeof(double)*Particles.np));
    HANDLE_ERROR(cudaMalloc((void**) &weight_dev, sizeof(double)*Particles.np));
-   HANDLE_ERROR(cudaMalloc((void**) &TimeBit_dev, sizeof(double)));
 	 // allocate space for the force array
    HANDLE_ERROR(cudaMalloc((void**) &forces_dev, 2*sizeof(double)*Particles.np));
 	 // init forces to 0
@@ -929,36 +839,38 @@ int main( int argc, char *argv[])    /* FinalApplication */
 	 double *forces;
 	 struct particle p1, p2;
 	 forces = (double*) malloc(2 * Particles.np * sizeof((double)1.0));
+   memset(forces, 0.0, 2 * Particles.np * sizeof(double));
 	 for (int k=0; k<MaxSteps; k++) {
+        DumpPopulation(Particles, k, "par_Population\0");
+        DumpForces(forces, k, Particles.np, "par_forces\0");
 		 int N = Particles.np;
 		 int dimGrid = (N-1)/TILE_WIDTH+1;
-//     HANDLE_ERROR(cudaMemset(forces_dev, 0, 2*sizeof(double)*Particles.np));
-//		 ForceCompt_par<<<dimGrid, dimBlock>>>(forces_dev, posX_dev, posY_dev, weight_dev, Particles.np);
-//		 ComptPopulation_par<<<dimGrid, dimBlock>>>(posX_dev, posY_dev, velX_dev, velY_dev, forces_dev, weight_dev, Particles.np, TimeBit);
-//		 HANDLE_ERROR(cudaDeviceSynchronize());
-		 DumpPopulation(Particles, k);
-		 memset(forces, 0, 2 * Particles.np * sizeof(double));
-		 for (int i=0; i < Particles.np; i++ ) {
-            newparticle(&p1,Particles.weight[i],Particles.x[i],Particles.y[i],Particles.vx[i],Particles.vy[i]);
-			for (int j=0; j < Particles.np; j++ ) {
-				if ( j != i ) {
-					newparticle(&p2,Particles.weight[j],Particles.x[j],Particles.y[j],Particles.vx[j],Particles.vy[j]);
-					ForceCompt(f,p1,p2);
-					forces[index2D(0,i,2)] = forces[index2D(0,i,2)] + f[0];
-					forces[index2D(1,i,2)] = forces[index2D(1,i,2)] + f[1];
-				};
-			};
-		 };
-		 ComptPopulation(&Particles, forces);
+     HANDLE_ERROR(cudaMemset(forces_dev, 0, 2*sizeof(double)*Particles.np));
+		 ForceCompt_par<<<dimGrid, dimBlock>>>(forces_dev, posX_dev, posY_dev, weight_dev, Particles.np);
+     HANDLE_ERROR(cudaMemcpy(forces, forces_dev, sizeof(double)*2*Particles.np, cudaMemcpyDeviceToHost));
+		 ComptPopulation_par<<<dimGrid, dimBlock>>>(posX_dev, posY_dev, velX_dev, velY_dev, forces_dev, weight_dev, Particles.np, TimeBit);
+		 HANDLE_ERROR(cudaDeviceSynchronize());
+     HANDLE_ERROR(cudaMemcpy(Particles.x, posX_dev, sizeof(double)*Particles.np, cudaMemcpyDeviceToHost));
+     HANDLE_ERROR(cudaMemcpy(Particles.y, posY_dev, sizeof(double)*Particles.np, cudaMemcpyDeviceToHost));
+     HANDLE_ERROR(cudaMemcpy(Particles.vx, velX_dev, sizeof(double)*Particles.np, cudaMemcpyDeviceToHost));
+     HANDLE_ERROR(cudaMemcpy(Particles.vy, velY_dev, sizeof(double)*Particles.np, cudaMemcpyDeviceToHost));
+     HANDLE_ERROR(cudaMemcpy(Particles.weight, weight_dev, sizeof(double)*Particles.np, cudaMemcpyDeviceToHost));
+
+//		 memset(forces, 0.0, 2 * Particles.np * sizeof(double));
+//		 for (int i=0; i < Particles.np; i++ ) {
+//            newparticle(&p1,Particles.weight[i],Particles.x[i],Particles.y[i],Particles.vx[i],Particles.vy[i]);
+//			for (int j=0; j < Particles.np; j++ ) {
+//				if ( j != i ) {
+//					newparticle(&p2,Particles.weight[j],Particles.x[j],Particles.y[j],Particles.vx[j],Particles.vy[j]);
+//					ForceCompt(f,p1,p2);
+//					forces[index2D(0,i,2)] = forces[index2D(0,i,2)] + f[0];
+//					forces[index2D(1,i,2)] = forces[index2D(1,i,2)] + f[1];
+//				};
+//			};
+//		 };
+//		 ComptPopulation(&Particles, forces);
 		 fprintf(stdout,"Step %d of %d\n",k+1,MaxSteps);
 	 };
-
-   printf("Copy back to host...\n");
-   HANDLE_ERROR(cudaMemcpy(Particles.x, posX_dev, sizeof(double)*Particles.np, cudaMemcpyDeviceToHost));
-   HANDLE_ERROR(cudaMemcpy(Particles.y, posY_dev, sizeof(double)*Particles.np, cudaMemcpyDeviceToHost));
-   HANDLE_ERROR(cudaMemcpy(Particles.vx, velX_dev, sizeof(double)*Particles.np, cudaMemcpyDeviceToHost));
-   HANDLE_ERROR(cudaMemcpy(Particles.vy, velY_dev, sizeof(double)*Particles.np, cudaMemcpyDeviceToHost));
-   HANDLE_ERROR(cudaMemcpy(Particles.weight, weight_dev, sizeof(double)*Particles.np, cudaMemcpyDeviceToHost));
 
    printf("Free device memory...\n");
 	 HANDLE_ERROR(cudaFree(posX_dev));
@@ -985,5 +897,3 @@ int main( int argc, char *argv[])    /* FinalApplication */
 
    return(0);
 }  // end FinalApplication
-
-
