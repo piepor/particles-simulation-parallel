@@ -845,14 +845,15 @@ int main( int argc, char *argv[])    /* FinalApplication */
 	 forces = (double*) malloc(2 * Particles.np * sizeof((double)1.0));
    memset(forces, 0.0, 2 * Particles.np * sizeof(double));
 	 for (int k=0; k<MaxSteps; k++) {
-        DumpPopulation(Particles, k, "par_Population\0");
-        DumpForces(forces, k, Particles.np, "par_forces\0");
 		 int N = Particles.np;
 		 int dimGrid = (N-1)/TILE_WIDTH+1;
      HANDLE_ERROR(cudaMemset(forces_dev, 0, 2*sizeof(double)*Particles.np));
 		 ForceCompt_par<<<dimGrid, dimBlock>>>(forces_dev, posX_dev, posY_dev, weight_dev, Particles.np);
      HANDLE_ERROR(cudaMemcpy(forces, forces_dev, sizeof(double)*2*Particles.np, cudaMemcpyDeviceToHost));
 		 ComptPopulation_par<<<dimGrid, dimBlock>>>(posX_dev, posY_dev, velX_dev, velY_dev, forces_dev, weight_dev, Particles.np, TimeBit);
+     DumpPopulation(Particles, k, "par_Population\0");
+     DumpForces(forces, k, Particles.np, "par_forces\0");
+		 ParticleScreen(&ParticleGrid,Particles,k);
 		 HANDLE_ERROR(cudaDeviceSynchronize());
      HANDLE_ERROR(cudaMemcpy(Particles.x, posX_dev, sizeof(double)*Particles.np, cudaMemcpyDeviceToHost));
      HANDLE_ERROR(cudaMemcpy(Particles.y, posY_dev, sizeof(double)*Particles.np, cudaMemcpyDeviceToHost));
