@@ -89,6 +89,11 @@ void DumpForces(double *forces, int t, int np, char *fileName)
     fclose(dump);
 }
 
+void print_Population(struct Population p) 
+{
+	printf("Population: np = %d\n",p.np);
+}
+
 void DumpPopulation(struct Population p, int t, char *fileName)
 {
     /*
@@ -831,7 +836,6 @@ int main( int argc, char *argv[])    /* FinalApplication */
    HANDLE_ERROR(cudaMemcpy(velX_dev, Particles.vx, sizeof(double)*Particles.np, cudaMemcpyHostToDevice));
    HANDLE_ERROR(cudaMemcpy(velY_dev, Particles.vy, sizeof(double)*Particles.np, cudaMemcpyHostToDevice));
    HANDLE_ERROR(cudaMemcpy(weight_dev, Particles.weight, sizeof(double)*Particles.np, cudaMemcpyHostToDevice));
-   HANDLE_ERROR(cudaMemcpy(TimeBit_dev, &TimeBit, sizeof(double), cudaMemcpyHostToDevice));
 
    printf("SystemEvolution...\n");
    //SystemEvolution(&ParticleGrid, &Particles, MaxSteps);
@@ -878,7 +882,6 @@ int main( int argc, char *argv[])    /* FinalApplication */
 	 HANDLE_ERROR(cudaFree(velX_dev));
 	 HANDLE_ERROR(cudaFree(velY_dev));
 	 HANDLE_ERROR(cudaFree(weight_dev));
-	 HANDLE_ERROR(cudaFree(TimeBit_dev));
 
    printf("Free host memory...\n");
 	 free(GenFieldGrid.Values);
