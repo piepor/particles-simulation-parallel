@@ -59,16 +59,22 @@ struct Population {
 int MaxIters, MaxSteps;
 double TimeBit; // Evolution time steps
 //////////////////////////      FUNCTION PROTOTYPES     /////////////////////////
-
+// utility functions
 int rowlen(char *riga);
 int readrow(char *rg, int nc, FILE *daleg);
-void InitGrid(char *InputFile);
-void ParticleScreen(struct i2dGrid *pgrid, struct Population p, int s);
-void IntVal2ppm(int s1, int s2, int *idata, int *vmin, int *vmax, char *name);
 double MaxIntVal(int s, int *a);
 double MinIntVal(int s, int *a);
 double MaxDoubleVal(int s, double *a);
 double MinDoubleVal(int s, double *a);
+// display functions
+void IntVal2ppm(int s1, int s2, int *idata, int *vmin, int *vmax, char *name);
+void DumpPopulation(struct Population p, int t, char *fileName);
+void print_Population(struct Population p);
+void DumpForces(double *forces, int t, int np, char *fileName);
+void print_i2dGrid(struct i2dGrid g);
+// processing
+void InitGrid(char *InputFile);
+void ParticleScreen(struct i2dGrid *pgrid, struct Population p, int s);
 void newparticle(struct particle *p, double weight, double x, double y,
                  double vx, double vy);
 void GeneratingField(struct i2dGrid *grid, int MaxIt);
@@ -76,6 +82,12 @@ void ParticleGeneration(struct i2dGrid grid, struct i2dGrid pgrid,
                         struct Population *pp);
 void SystemEvolution(struct i2dGrid *pgrid, struct Population *pp, int mxiter);
 void ForceCompt(double *f, struct particle p1, struct particle p2);
+__global__ void ForceCompt_par(double *f, double *x, double *y, double *weight,
+                               int np);
+void ComptPopulation(struct Population *p, double *forces);
+__global__ void ComptPopulation_par(double *x, double *y, double *vx,
+                                    double *vy, double *f, double *weight,
+                                    int np, double TimeBit);
 
 //////////////////////////      UTILITY FUNCTIONS      //////////////////////////
 
