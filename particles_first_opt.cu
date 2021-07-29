@@ -760,49 +760,27 @@ void ForceCompt(double *f, struct particle p1, struct particle p2) {
     f[1] = force * dy / sqrt(d2);
 }
 
-__global__ void ForceCompt_par(double *f, double *x, double *y,
-        double *weight, int np, bool onXCoord) {
-    int col = blockIdx.x * blockDim.x + threadIdx.x;
-    int row = blockIdx.y * blockDim.y + threadIdx.y;
-    double force, d, d2, dx, dy, fcompt;
+__global__ void ForceCompt_par(double *f, double *x, double *y, double *weight,
+                               int np) {
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    double force, d, d2, dx, dy, fx, fy;
     static double k = 0.001, tiny = (double)1.0 / (double)1000000.0;
 
-    if (row < np && col < np) {
-            if (col != row) {
-                dx = x[row] - x[col];
-                dy = y[row] - y[col];
+    if (tid < np) {
+        for (int i = 0; i < np; i++) {
+            if (i != tid) {
+                dx = x[i] - x[tid];
+                dy = y[i] - y[tid];
                 d2 = dx * dx +
                      dy * dy; // what if particles get in touch? Simply avoid the case
                 if (d2 < tiny)
                     d2 = tiny;
-                force = (k * weight[col] * weight[row]) / d2;
-                if (onXCoord == 1) {
-                    fcompt = force * dx / sqrt(d2);
-                }
-                else {
-                    fcompt = force * dy / sqrt(d2);
-                }
-                f[row*np + col] = fcompt;
+                force = (k * weight[tid] * weight[i]) / d2;
+                fx = force * dx / sqrt(d2);
+                fy = force * dy / sqrt(d2);
+                f[0 + tid * 2] = f[0 + tid * 2] + fx;
+                f[1 + tid * 2] = f[1 + tid * 2] + fy;
             }
-            else {
-                f[row*np + col] = 0;
-            }
-    }
-}
-
-__global__ void ReduceForce(double *f, double *fcompt, int np, bool onXCoord){
-    int tid = blockIdx.x * blockDim.x + threadIdx.x;
-    double totForce = 0;
-    
-    if (tid < np){
-        for (int i = 0; i < np; i++){
-            totForce += fcompt[tid*np + i];
-        }
-        if (onXCoord == 1){
-            f[0 + tid*2] = totForce;
-        }
-        else {
-            f[1 + tid*2] = totForce;
         }
     }
 }
@@ -859,7 +837,7 @@ int main(int argc, char *argv[]) {
     // dim3 dimBlock (TILE_WIDTH, TILE_WIDTH);
     // dim3 dimGrid ((GenFieldGrid.EX-1)/TILE_WIDTH+1,
     // (GenFieldGrid.EX-1)/TILE_WIDTH+1);
-    //const int dimBlock = TILE_WIDTH;
+    const int dimBlock = TILE_WIDTH;
 
     time(&t0);
     fprintf(stdout, "Starting at: %s", asctime(localtime(&t0)));
@@ -892,19 +870,12 @@ int main(int argc, char *argv[]) {
     double *velY_dev;
     double *weight_dev;
     double *forces_dev;
-    double *forceCompt_dev;
-    //double *forceY_dev;
     HANDLE_ERROR(cudaMalloc((void **)&posX_dev, sizeof(double) * Particles.np));
     HANDLE_ERROR(cudaMalloc((void **)&posY_dev, sizeof(double) * Particles.np));
     HANDLE_ERROR(cudaMalloc((void **)&velX_dev, sizeof(double) * Particles.np));
     HANDLE_ERROR(cudaMalloc((void **)&velY_dev, sizeof(double) * Particles.np));
     HANDLE_ERROR(cudaMalloc((void **)&weight_dev, sizeof(double) * Particles.np));
     // allocate space for the force array
-    // NEW CODE WITH REDUCTION AND FORCES MATRICES
-    HANDLE_ERROR(
-            cudaMalloc((void **)&forceCompt_dev, sizeof(double) * Particles.np * Particles.np));
-    //HANDLE_ERROR(
-    //        cudaMalloc((void **)&forceY_dev, sizeof(double) * Particles.np * Particles.np));
     HANDLE_ERROR(
             cudaMalloc((void **)&forces_dev, 2 * sizeof(double) * Particles.np));
     // init forces to 0
@@ -930,26 +901,15 @@ int main(int argc, char *argv[]) {
     forces = (double *)malloc(2 * Particles.np * sizeof((double)1.0));
     memset(forces, 0.0, 2 * Particles.np * sizeof(double));
     int N = Particles.np;
-    dim3 dimBlock(TILE_WIDTH, TILE_WIDTH);
-    dim3 dimGrid(N / TILE_WIDTH + 1, N / TILE_WIDTH + 1);
-    int dimBlock1d = TILE_WIDTH;
-    int dimGrid1d = N / TILE_WIDTH + 1;
+    int dimGrid = (N - 1) / TILE_WIDTH + 1;
     for (int k = 0; k < MaxSteps; k++) {
-        //HANDLE_ERROR(cudaMemset(forces_dev, 0, 2 * sizeof(double) * Particles.np));
-        ForceCompt_par<<<dimGrid, dimBlock>>>(forceCompt_dev, posX_dev, posY_dev,
-                weight_dev, Particles.np, 1);
-        //HANDLE_ERROR(cudaDeviceSynchronize());
-        ReduceForce<<<dimGrid1d, dimBlock1d>>>(forces_dev, forceCompt_dev, Particles.np, 1);
-        //HANDLE_ERROR(cudaDeviceSynchronize());
-        ForceCompt_par<<<dimGrid, dimBlock>>>(forceCompt_dev, posX_dev, posY_dev,
-                weight_dev, Particles.np, 0);
-        //HANDLE_ERROR(cudaDeviceSynchronize());
-        ReduceForce<<<dimGrid1d, dimBlock1d>>>(forces_dev, forceCompt_dev, Particles.np, 0);
+        HANDLE_ERROR(cudaMemset(forces_dev, 0, 2 * sizeof(double) * Particles.np));
+        ForceCompt_par<<<dimGrid, dimBlock>>>(forces_dev, posX_dev, posY_dev,
+                                              weight_dev, Particles.np);
 //        HANDLE_ERROR(cudaMemcpy(forces, forces_dev,
 //                                sizeof(double) * 2 * Particles.np,
 //                                cudaMemcpyDeviceToHost));
-        HANDLE_ERROR(cudaDeviceSynchronize());
-        ComptPopulation_par<<<dimGrid1d, dimBlock1d>>>(posX_dev, posY_dev, velX_dev,
+        ComptPopulation_par<<<dimGrid, dimBlock>>>(posX_dev, posY_dev, velX_dev,
                                                    velY_dev, forces_dev, weight_dev,
                                                    Particles.np, TimeBit);
         DumpPopulation(Particles, k, "par_Population\0");
@@ -997,7 +957,6 @@ int main(int argc, char *argv[]) {
     HANDLE_ERROR(cudaFree(velY_dev));
     HANDLE_ERROR(cudaFree(weight_dev));
     HANDLE_ERROR(cudaFree(forces_dev));
-    HANDLE_ERROR(cudaFree(forceCompt_dev));
 
     printf("Free host memory...\n");
     free(GenFieldGrid.Values);
