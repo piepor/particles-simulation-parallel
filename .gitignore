@@ -59,3 +59,7 @@ dkms.conf
 **.sta
 **.jpg
 **.ppm
+
+# report qdrep
+**.qdrep
+**.sqlite
