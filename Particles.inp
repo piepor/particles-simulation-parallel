@@ -19,6 +19,6 @@
 # iterations for particle generation
 3000
 # iterations for particle dynamics
-10
+100
 # bit of time for particle dynamics
 0.001

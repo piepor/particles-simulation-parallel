@@ -260,17 +260,45 @@ void DumpPopulation(struct Population p, int t, char *fileName) {
     fclose(dump);
 }
 
-__global__ ParticleScreen_par():
+__global__ void ParticleScreen_par(int *values, double *weight, double *x, double *y, int np, int EX, int EY, int Xs, int Ys, int Xe, int Ye, double rmin, double rmax){
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    int ix, iy, wp;
+    double Dx, Dy, wint, wv;
+    int vp;
+    
+    if (tid < np){
+        Dx = Xe - Xs;
+        Dy = Ye - Ys;
+        ix = EX * x[tid] / Dx;
+        iy = EY * y[tid] / Dy;
+        if ((ix < EX - 1 && ix > 0) && (iy < EY && iy > 0)) {
+            wint = rmax - rmin;
+            wv = weight[tid] - rmin;
+            wp = 10.0 * wv / wint;
+            if (wp < 0)
+              wp = 0;
+            if (wp > 10)
+              wp = 10;
+            vp = (int)((double)(wp - 0) * (double)255.0 / (double)(10 - 0));
+            values[ix + iy*EX] = vp;
+            values[ix - 1 + iy*EX] = vp;
+            values[ix + 1 + iy*EX] = vp;
+            values[ix + (iy - 1)*EX] = vp;
+            values[ix + (iy + 1)*EX] = vp;
+        }
+    }
+}
 
 void ParticleScreen(struct i2dGrid *pgrid, struct Population pp, int step) {
     // Distribute a particle population in a grid for visualization purposes
 
     int ix, iy, Xdots, Ydots;
-    int np, n, wp;
+    int np, n;//, wp;
     double rmin, rmax;
     int static vmin, vmax;
     double Dx, Dy, wint, wv;
     char name[40];
+    double wp;
 
     Xdots = pgrid->EX;
     Ydots = pgrid->EY;
@@ -305,6 +333,91 @@ void ParticleScreen(struct i2dGrid *pgrid, struct Population pp, int step) {
         vmin = vmax = 0;
     }
     IntVal2ppm(pgrid->EX, pgrid->EY, pgrid->Values, &vmin, &vmax, name);
+}
+
+//__global__ void IntVal2ppm_par(int *idata, int s1, int s2, double rmin, double rmax) {
+//    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+//
+//    if (tid < np) {
+//        value = idata[tid];
+//        if (value < rmin)
+//          value = rmin;
+//        if (value > rmax)
+//          value = rmax;
+//        vp = (int)((double)(value - rmin) * (double)255.0 / (double)(rmax - rmin));
+//        idata[row * s2 + col] = vp;
+//    }
+//}
+
+void WriteImage(int s1, int s2, int *idata, char *name){
+    /*
+     Simple subroutine to dump double data with fixed min & max values
+     in a PPM format
+   */
+    int i, j;
+    int cm[3][256]; /* R,G,B, Colour Map */
+    FILE *ouni, *ColMap;
+    int vp, vs;
+    int rmin, rmax, value;
+    char fname[80], jname[80], command[80];
+    /*
+     Define color map: 256 colours
+   */
+    ColMap = fopen("ColorMap.txt", "r");
+    if (ColMap == NULL) {
+        fprintf(stderr, "Error read opening file ColorMap.txt\n");
+        exit(-1);
+    }
+    for (i = 0; i < 256; i++) {
+        if (fscanf(ColMap, " %3d %3d %3d", &cm[0][i], &cm[1][i], &cm[2][i]) < 3) {
+            fprintf(stderr, "Error reading colour map at line %d: r, g, b =",
+                    (i + 1));
+            fprintf(stderr, " %3.3d %3.3d %3.3d\n", cm[0][i], cm[1][i], cm[2][i]);
+            exit(1);
+        }
+    }
+    /*
+     Write on unit 700 with  PPM format
+   */
+    strcpy(fname, name);
+    strcat(fname, ".ppm\0");
+    ouni = fopen(fname, "w");
+    if (!ouni) {
+        fprintf(stderr, "!!!! Error write access to file %s\n", fname);
+    }
+    /*  Magic code */
+    fprintf(ouni, "P3\n");
+    /*  Dimensions */
+    fprintf(ouni, "%d %d\n", s1, s2);
+    /*  Maximum value */
+    fprintf(ouni, "255\n");
+    /*  Values from 0 to 255 */
+    vs = 0;
+    for (i = 0; i < s1; i++) {
+        for (j = 0; j < s2; j++) {
+            vp = idata[i * s2 + j];
+            vs++;
+            //printf("rmax - rmin: %d \n", rmax-rmin);
+            fprintf(ouni, " %3.3d %3.3d %3.3d", cm[0][vp], cm[1][vp], cm[2][vp]);
+            if (vs >= 10) {
+                fprintf(ouni, " \n");
+                vs = 0;
+            }
+        }
+        fprintf(ouni, " ");
+        vs = 0;
+    }
+    //printf("rmin: %d - rmax %d", rmin, rmax);
+    fclose(ouni);
+    // the following instructions require ImageMagick tool: comment out if not
+    // available
+    strcpy(jname, name);
+    strcat(jname, ".jpg\0");
+    sprintf(command, "convert %s %s\0", fname, jname);
+    system(command);
+
+    return;
+
 }
 
 void IntVal2ppm(int s1, int s2, int *idata, int *vmin, int *vmax, char *name) {
@@ -370,6 +483,7 @@ void IntVal2ppm(int s1, int s2, int *idata, int *vmin, int *vmax, char *name) {
             vp =
                     (int)((double)(value - rmin) * (double)255.0 / (double)(rmax - rmin));
             vs++;
+            //printf("rmax - rmin: %d \n", rmax-rmin);
             fprintf(ouni, " %3.3d %3.3d %3.3d", cm[0][vp], cm[1][vp], cm[2][vp]);
             if (vs >= 10) {
                 fprintf(ouni, " \n");
@@ -379,6 +493,7 @@ void IntVal2ppm(int s1, int s2, int *idata, int *vmin, int *vmax, char *name) {
         fprintf(ouni, " ");
         vs = 0;
     }
+    //printf("rmin: %d - rmax %d", rmin, rmax);
     fclose(ouni);
     // the following instructions require ImageMagick tool: comment out if not
     // available
@@ -872,7 +987,7 @@ int main(int argc, char *argv[]) {
     double *velY_dev;
     double *weight_dev;
     double *forces_dev;
-    double *grid_dev;
+    int *grid_dev;
     HANDLE_ERROR(cudaMalloc((void **)&posX_dev, sizeof(double) * Particles.np));
     HANDLE_ERROR(cudaMalloc((void **)&posY_dev, sizeof(double) * Particles.np));
     HANDLE_ERROR(cudaMalloc((void **)&velX_dev, sizeof(double) * Particles.np));
@@ -893,8 +1008,9 @@ int main(int argc, char *argv[]) {
                             cudaMemcpyHostToDevice));
     HANDLE_ERROR(cudaMemcpy(velY_dev, Particles.vy, sizeof(double) * Particles.np,
                             cudaMemcpyHostToDevice));
-    HANDLE_ERROR(cudaMemcpy(weight_dev, Particles.weight,
-                            sizeof(double) * Particles.np,
+    HANDLE_ERROR(cudaMemcpy(weight_dev, Particles.weight, sizeof(double) * Particles.np,
+                            cudaMemcpyHostToDevice));
+    HANDLE_ERROR(cudaMemcpy(grid_dev, ParticleGrid.Values, sizeof(double) * ParticleGrid.Xe * ParticleGrid.Ye,
                             cudaMemcpyHostToDevice));
 
     printf("SystemEvolution...\n");
@@ -906,8 +1022,13 @@ int main(int argc, char *argv[]) {
     memset(forces, 0.0, 2 * Particles.np * sizeof(double));
     int N = Particles.np;
     int dimGrid = (N - 1) / TILE_WIDTH + 1;
+    double rmin, rmax;
+    rmax = MaxDoubleVal(Particles.np, Particles.weight);
+    rmin = MinDoubleVal(Particles.np, Particles.weight);
+    char name[40];
     for (int k = 0; k < MaxSteps; k++) {
         HANDLE_ERROR(cudaMemset(forces_dev, 0, 2 * sizeof(double) * Particles.np));
+        HANDLE_ERROR(cudaMemset(grid_dev, 0, sizeof(int) * ParticleGrid.EX * ParticleGrid.EY));
         ForceCompt_par<<<dimGrid, dimBlock>>>(forces_dev, posX_dev, posY_dev,
                                               weight_dev, Particles.np);
 //        HANDLE_ERROR(cudaMemcpy(forces, forces_dev,
@@ -916,6 +1037,11 @@ int main(int argc, char *argv[]) {
         ComptPopulation_par<<<dimGrid, dimBlock>>>(posX_dev, posY_dev, velX_dev,
                                                    velY_dev, forces_dev, weight_dev,
                                                    Particles.np, TimeBit);
+        ParticleScreen_par<<<dimGrid, dimBlock>>>(grid_dev, weight_dev, posX_dev, posY_dev,
+                Particles.np, ParticleGrid.EX, ParticleGrid.EY, ParticleGrid.Xs, ParticleGrid.Ys,
+                ParticleGrid.Xe, ParticleGrid.Ye, rmin, rmax);
+        sprintf(name, "stage%3.3d\0", k);
+        WriteImage(ParticleGrid.EX, ParticleGrid.EY, ParticleGrid.Values, name);
         DumpPopulation(Particles, k, "par_Population\0");
 //        DumpForces(forces, k, Particles.np, "par_forces\0");
         //ParticleScreen(&ParticleGrid, Particles, k);
@@ -934,6 +1060,9 @@ int main(int argc, char *argv[]) {
                                 cudaMemcpyDeviceToHost));
         HANDLE_ERROR(cudaMemcpy(Particles.weight, weight_dev,
                                 sizeof(double) * Particles.np,
+                                cudaMemcpyDeviceToHost));
+        HANDLE_ERROR(cudaMemcpy(ParticleGrid.Values, grid_dev,
+                                sizeof(int) * ParticleGrid.EX * ParticleGrid.EY,
                                 cudaMemcpyDeviceToHost));
 
         //               memset(forces, 0.0, 2 * Particles.np * sizeof(double));
