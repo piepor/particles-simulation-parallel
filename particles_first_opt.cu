@@ -230,6 +230,28 @@ void DumpForces(double *forces, int t, int np, char *fileName) {
     fclose(dump);
 }
 
+void DumpGridValues(int *values, int t, int s1, int s2, char *fileName) {
+    /*
+   * save population values on file
+   */
+    char fname[80];
+    FILE *dump;
+
+    sprintf(fname, "%s%4.4d.dmp\0", fileName, t);
+    dump = fopen(fname, "wt");
+    if (dump == NULL) {
+        fprintf(stderr, "Error write open file %s\n", fname);
+        exit(1);
+    }
+    for (int i = 0; i < s1; i++) {
+        for (int j = 0; j < s2; j++) {
+            fprintf(dump, "%d ", values[i*s2 + j]);
+        }
+        fprintf(dump, "\n");
+    }
+    fclose(dump);
+}
+
 void print_Population(struct Population p) {
     printf("Population: np = %d\n", p.np);
 }
@@ -282,6 +304,9 @@ void ParticleScreen(struct i2dGrid *pgrid, struct Population pp, int step) {
     wint = rmax - rmin;
     Dx = pgrid->Xe - pgrid->Xs;
     Dy = pgrid->Ye - pgrid->Ys;
+   // printf("EX: %d, EY: %d\n", pgrid->EX, pgrid->EY);
+   // printf("Xe: %lf, Ye: %lf\n", pgrid->Xe, pgrid->Ye);
+   // printf("Xs: %lf, Ys: %lf\n", pgrid->Xs, pgrid->Ys);
     for (n = 0; n < pp.np; n++) {
         // keep a tiny border free anyway
         ix = Xdots * pp.x[n] / Dx;
@@ -292,11 +317,19 @@ void ParticleScreen(struct i2dGrid *pgrid, struct Population pp, int step) {
             continue;
         wv = pp.weight[n] - rmin;
         wp = 10.0 * wv / wint;
+//        if (wp > 5){
+//            printf("number of the particle: %d\n", n);
+//        }
+       // if (n == 2566){
+       //     printf("ix: %lf\n", Xdots * pp.x[n] / Dx);
+       //     printf("iy: %lf\n", Ydots * pp.y[n] / Dy);
+       //     printf("wp: %lf\n", 10.0 * wv / wint);
+       // }
         pgrid->Values[index2D(ix, iy, Xdots)] = wp;
-        pgrid->Values[index2D(ix - 1, iy, Xdots)] = wp;
-        pgrid->Values[index2D(ix + 1, iy, Xdots)] = wp;
-        pgrid->Values[index2D(ix, iy - 1, Xdots)] = wp;
-        pgrid->Values[index2D(ix, iy + 1, Xdots)] = wp;
+       // pgrid->Values[index2D(ix - 1, iy, Xdots)] = wp;
+       // pgrid->Values[index2D(ix + 1, iy, Xdots)] = wp;
+       // pgrid->Values[index2D(ix, iy - 1, Xdots)] = wp;
+       // pgrid->Values[index2D(ix, iy + 1, Xdots)] = wp;
     }
     sprintf(name, "stage%3.3d\0", step);
     if (step <= 0) {
@@ -358,6 +391,9 @@ void IntVal2ppm(int s1, int s2, int *idata, int *vmin, int *vmax, char *name) {
         rmax = *vmax;
     }
     vs = 0;
+    //printf("rmin: %d, rmax: %d\n", rmin, rmax);
+    //printf("vmin: %d, vmax: %d\n", *vmin, *vmax);
+
     for (i = 0; i < s1; i++) {
         for (j = 0; j < s2; j++) {
             value = idata[i * s2 + j];
@@ -915,6 +951,7 @@ int main(int argc, char *argv[]) {
         DumpPopulation(Particles, k, "par_Population\0");
 //        DumpForces(forces, k, Particles.np, "par_forces\0");
         ParticleScreen(&ParticleGrid, Particles, k);
+        DumpGridValues(ParticleGrid.Values, k, ParticleGrid.EX, ParticleGrid.EY, "right_values\0");
         HANDLE_ERROR(cudaDeviceSynchronize());
         HANDLE_ERROR(cudaMemcpy(Particles.x, posX_dev,
                                 sizeof(double) * Particles.np,

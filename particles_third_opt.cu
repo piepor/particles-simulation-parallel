@@ -234,6 +234,28 @@ void print_Population(struct Population p) {
     printf("Population: np = %d\n", p.np);
 }
 
+void DumpGridValues(int *values, int t, int s1, int s2, char *fileName) {
+    /*
+   * save population values on file
+   */
+    char fname[80];
+    FILE *dump;
+
+    sprintf(fname, "%s%4.4d.dmp\0", fileName, t);
+    dump = fopen(fname, "wt");
+    if (dump == NULL) {
+        fprintf(stderr, "Error write open file %s\n", fname);
+        exit(1);
+    }
+    for (int i = 0; i < s1; i++) {
+        for (int j = 0; j < s2; j++) {
+            fprintf(dump, "%d ", (int) (((double) values[i*s2 + j]) / 255.0 * 10.0));
+        }
+        fprintf(dump, "\n");
+    }
+    fclose(dump);
+}
+
 void DumpPopulation(struct Population p, int t, char *fileName) {
     /*
    * save population values on file
@@ -271,7 +293,7 @@ __global__ void ParticleScreen_par(int *values, double *weight, double *x, doubl
         Dy = Ye - Ys;
         ix = EX * x[tid] / Dx;
         iy = EY * y[tid] / Dy;
-        if ((ix < EX - 1 && ix > 0) && (iy < EY && iy > 0)) {
+        if ((ix < EX - 1 && ix > 0) && (iy < EY - 1 && iy > 0)) {
             wint = rmax - rmin;
             wv = weight[tid] - rmin;
             wp = 10.0 * wv / wint;
@@ -279,12 +301,17 @@ __global__ void ParticleScreen_par(int *values, double *weight, double *x, doubl
               wp = 0;
             if (wp > 10)
               wp = 10;
+           // if (tid == 2566){
+           //     printf("ix: %lf\n", EX * x[tid] / Dx);
+           //     printf("iy: %lf\n", EY * y[tid] / Dy);
+           //     printf("wp: %lf\n", 10.0 * wv /wint);
+           // }
             vp = (int)((double)(wp - 0) * (double)255.0 / (double)(10 - 0));
             values[ix + iy*EX] = vp;
-            values[ix - 1 + iy*EX] = vp;
-            values[ix + 1 + iy*EX] = vp;
-            values[ix + (iy - 1)*EX] = vp;
-            values[ix + (iy + 1)*EX] = vp;
+           // values[ix - 1 + iy*EX] = vp;
+           // values[ix + 1 + iy*EX] = vp;
+           // values[ix + (iy - 1)*EX] = vp;
+           // values[ix + (iy + 1)*EX] = vp;
         }
     }
 }
@@ -1041,8 +1068,8 @@ int main(int argc, char *argv[]) {
                 Particles.np, ParticleGrid.EX, ParticleGrid.EY, ParticleGrid.Xs, ParticleGrid.Ys,
                 ParticleGrid.Xe, ParticleGrid.Ye, rmin, rmax);
         sprintf(name, "stage%3.3d\0", k);
-        WriteImage(ParticleGrid.EX, ParticleGrid.EY, ParticleGrid.Values, name);
         DumpPopulation(Particles, k, "par_Population\0");
+        DumpGridValues(ParticleGrid.Values, k, ParticleGrid.EX, ParticleGrid.EY, "par_values\0");
 //        DumpForces(forces, k, Particles.np, "par_forces\0");
         //ParticleScreen(&ParticleGrid, Particles, k);
         HANDLE_ERROR(cudaDeviceSynchronize());
@@ -1064,6 +1091,7 @@ int main(int argc, char *argv[]) {
         HANDLE_ERROR(cudaMemcpy(ParticleGrid.Values, grid_dev,
                                 sizeof(int) * ParticleGrid.EX * ParticleGrid.EY,
                                 cudaMemcpyDeviceToHost));
+        WriteImage(ParticleGrid.EX, ParticleGrid.EY, ParticleGrid.Values, name);
 
         //               memset(forces, 0.0, 2 * Particles.np * sizeof(double));
         //               for (int i=0; i < Particles.np; i++ ) {

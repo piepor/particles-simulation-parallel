@@ -767,7 +767,8 @@ __global__ void ForceCompt_par(double *f, double *x, double *y,
     double force, d, d2, dx, dy, fcompt;
     static double k = 0.001, tiny = (double)1.0 / (double)1000000.0;
 
-    if (row < np && col < np) {
+    //if (row < np && col < np) {
+    while (row < np && col < np) {
             if (col != row) {
                 dx = x[row] - x[col];
                 dy = y[row] - y[col];
@@ -787,6 +788,8 @@ __global__ void ForceCompt_par(double *f, double *x, double *y,
             else {
                 f[row*np + col] = 0;
             }
+            col += blockDim.x * gridDim.x;
+            row += blockDim.y * gridDim.y;
     }
 }
 
