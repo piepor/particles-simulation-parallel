@@ -63,3 +63,7 @@ dkms.conf
 # report qdrep
 **.qdrep
 **.sqlite
+
+# presentazione
+presentazione/~$*
+
