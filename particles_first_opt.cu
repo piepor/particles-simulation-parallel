@@ -940,6 +940,7 @@ int main(int argc, char *argv[]) {
     int dimGrid = (N - 1) / TILE_WIDTH + 1;
     for (int k = 0; k < MaxSteps; k++) {
         HANDLE_ERROR(cudaMemset(forces_dev, 0, 2 * sizeof(double) * Particles.np));
+        HANDLE_ERROR(cudaDeviceSynchronize());
         ForceCompt_par<<<dimGrid, dimBlock>>>(forces_dev, posX_dev, posY_dev,
                                               weight_dev, Particles.np);
 //        HANDLE_ERROR(cudaMemcpy(forces, forces_dev,
