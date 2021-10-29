@@ -548,7 +548,7 @@ void SystemEvolution(struct i2dGrid *pgrid, struct Population *pp, int mxiter)
 	 // compute forces acting on each particle step by step
      for ( t=0; t < mxiter; t++ ) {
 		 fprintf(stdout,"Step %d of %d\n",t,mxiter);
-		 ParticleScreen(pgrid,*pp,t);
+		 //ParticleScreen(pgrid,*pp,t);
 		 // DumpPopulation call frequency may be changed
 		 if ( t%4 == 0 ) DumpPopulation(*pp,t);
 		 ParticleStats(*pp,t);
@@ -791,7 +791,7 @@ void IntVal2ppm(int s1, int s2, int *idata, int *vmin, int *vmax, char* name)
 int main( int argc, char *argv[])    /* FinalApplication */
 {
 #include <time.h>
-   time_t t0, t1;
+   time_t t0, t1, t2;
    
    time(&t0);
    fprintf(stdout,"Starting at: %s", asctime(localtime(&t0)));
@@ -816,11 +816,13 @@ int main( int argc, char *argv[])    /* FinalApplication */
    
    // Compute evolution of the particle population
    printf("SystemEvolution...\n");
+   time(&t2);
    SystemEvolution(&ParticleGrid, &Particles, MaxSteps);
    
    time(&t1);
    fprintf(stdout,"Ending   at: %s", asctime(localtime(&t1)));
    fprintf(stdout,"Computations ended in %lf seconds\n",difftime(t1,t0));
+   fprintf(stdout,"Computations system evolution ended in %lf seconds\n",difftime(t1,t2));
 
    fprintf(stdout,"End of program!\n");
 
