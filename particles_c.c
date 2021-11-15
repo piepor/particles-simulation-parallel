@@ -822,7 +822,7 @@ int main( int argc, char *argv[])    /* FinalApplication */
    time(&t1);
    fprintf(stdout,"Ending   at: %s", asctime(localtime(&t1)));
    fprintf(stdout,"Computations ended in %lf seconds\n",difftime(t1,t0));
-   fprintf(stdout,"Computations system evolution ended in %lf seconds\n",difftime(t1,t2));
+   //fprintf(stdout,"Computations system evolution ended in %lf seconds\n",difftime(t1,t2));
 
    fprintf(stdout,"End of program!\n");
 

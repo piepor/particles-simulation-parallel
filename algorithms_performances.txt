@@ -1,0 +1,73 @@
+Population 21352
+
+Serial
+  107 s
+  107 s
+  107 s
+  106 s
+  106 s
+  108 s
+  108 s
+  106 s
+  106 s
+  106 s
+
+Serial without write image
+  107 s
+  105 s
+  107 s
+  106 s
+  105 s
+  104 s
+  103 s
+  106 s
+  105 s
+  105 s
+
+First Opt
+  4 s 
+  4 s
+  4 s
+  4 s
+  5 s
+  4 s
+  4 s
+  5 s
+  4 s
+  4 s
+
+Two streams
+  5 s
+  6 s
+  6 s
+  6 s
+  6 s
+  5 s
+  6 s
+  6 s
+  6 s
+  6 s
+
+Reduction
+  5 s
+  4 s
+  5 s
+  5 s
+  5 s
+  5 s
+  5 s
+  5 s
+  5 s
+  5 s
+
+Two streams reduction
+  6 s
+  7 s
+  6 s
+  6 s
+  6 s
+  6 s
+  6 s
+  6 s
+  6 s
+  6 s
