@@ -1,0 +1,10 @@
+https://latex2png.com/
+
+http://rogercortesi.com/eqn/index.php
+
+Force(p1,p2) = k * \frac{W_{p1}*W_{p2}}{D(p1,p2)^{2}}​
+
+
+D(p1,p2) = \sqrt{(X_{p1} - X_{p2})^{2} + (Y_{p1} - Y_{p2})^{2}}
+
+
