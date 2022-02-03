@@ -1054,6 +1054,7 @@ int main(int argc, char *argv[]) {
     rmin = MinDoubleVal(Particles.np, Particles.weight);
     char name[40];
     for (int k = 0; k < MaxSteps; k++) {
+        //printf("ciao");
         HANDLE_ERROR(cudaMemset(forces_dev, 0, 2 * sizeof(double) * Particles.np));
         HANDLE_ERROR(cudaMemset(grid_dev, 0, sizeof(int) * ParticleGrid.EX * ParticleGrid.EY));
         ForceCompt_par<<<dimGrid, dimBlock>>>(forces_dev, posX_dev, posY_dev,

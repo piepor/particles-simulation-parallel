@@ -71,3 +71,15 @@ Two streams reduction
   6 s
   6 s
   6 s
+
+Third Option
+  5 s
+  5 s
+  5 s
+  5 s
+  4 s
+  5 s
+  5 s
+  5 s
+  5 s
+  4 s
