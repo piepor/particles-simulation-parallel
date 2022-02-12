@@ -931,6 +931,9 @@ int main(int argc, char *argv[]) {
 
     printf("SystemEvolution...\n");
     // SystemEvolution(&ParticleGrid, &Particles, MaxSteps);
+    cudaEvent_t start, stop;
+    float time_kernel;
+    float bandwidth;
     double f[2];
     double *forces;
     struct particle p1, p2;
@@ -938,11 +941,17 @@ int main(int argc, char *argv[]) {
     memset(forces, 0.0, 2 * Particles.np * sizeof(double));
     int N = Particles.np;
     int dimGrid = (N - 1) / TILE_WIDTH + 1;
+    HANDLE_ERROR(cudaEventCreate(&start));
+    HANDLE_ERROR(cudaEventCreate(&stop));
     for (int k = 0; k < MaxSteps; k++) {
         HANDLE_ERROR(cudaMemset(forces_dev, 0, 2 * sizeof(double) * Particles.np));
-        HANDLE_ERROR(cudaDeviceSynchronize());
+        //HANDLE_ERROR(cudaDeviceSynchronize());
+        HANDLE_ERROR(cudaEventRecord(start, 0));
         ForceCompt_par<<<dimGrid, dimBlock>>>(forces_dev, posX_dev, posY_dev,
                                               weight_dev, Particles.np);
+        HANDLE_ERROR(cudaEventRecord(stop, 0));
+        HANDLE_ERROR(cudaEventSynchronize(stop));
+        HANDLE_ERROR(cudaEventElapsedTime(&time_kernel, start, stop));
 //        HANDLE_ERROR(cudaMemcpy(forces, forces_dev,
 //                                sizeof(double) * 2 * Particles.np,
 //                                cudaMemcpyDeviceToHost));
@@ -985,9 +994,13 @@ int main(int argc, char *argv[]) {
         //                      };
         //               };
         //               ComptPopulation(&Particles, forces);
+        bandwidth = ((2 * sizeof(double) * Particles.np + sizeof(double) * Particles.np + sizeof(double) * Particles.np + sizeof(double) * Particles.np + sizeof(int)) / pow(10, 9)) / (time_kernel/1000);
         fprintf(stdout, "Step %d of %d\n", k + 1, MaxSteps);
+        fprintf(stdout, "Bandwidth first kernel: %f\n", bandwidth);
     };
 
+    HANDLE_ERROR(cudaEventDestroy(start));
+    HANDLE_ERROR(cudaEventDestroy(stop));
     printf("Free device memory...\n");
     HANDLE_ERROR(cudaFree(posX_dev));
     HANDLE_ERROR(cudaFree(posY_dev));
