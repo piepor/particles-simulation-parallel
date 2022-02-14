@@ -1,14 +1,18 @@
-# particles-simulation-parallel
-Simple parallel simulation using CUDA of particles in a gravitational field
+# CUDA kernels for Particles simulation
 
+## Description
+Simple simulation of particles in a gravitational field using CUDA.
 
-In the 07-Particles2D folders there are sequential source codes to be optimized and scripts for 
-compiling and running on GALILEO (with few changes on any other similar cluster).
-Tests have been realized with GNU compilers, but other C and Fortran compilers should do as well
+## Authors:
+- Pietro Portolani, IT PhD candidate @ Politecnico di Milano
+- Tommaso Alfonsi, IT PhD candidate @ Politecnico di Milano
 
-The generated image files could be assembled to create a video like stage.avi, 10 frames/sec
+## [Slides (italian)](https://github.com/piepor/particles-simulation-parallel/blob/9aba280d10bd8cc36bb56d3a3e9b3f10f0379fd3/presentazione/presentazione.pptx)
 
-During developing the program optimized version, the "iterations for particle dynamics" parameter
-in Particles.inp could be changed in 10.
-
-Would you please read the comments in the source code for further instructions
+## Code versions:
+- [Original source code](https://github.com/piepor/particles-simulation-parallel/blob/9aba280d10bd8cc36bb56d3a3e9b3f10f0379fd3/original_code/07-Particles2D/07-Particles2D_c/particles_c.c)
+- [GPU accelerated version (final)](https://github.com/piepor/particles-simulation-parallel/blob/9aba280d10bd8cc36bb56d3a3e9b3f10f0379fd3/particles_first_opt.cu)
+- Other accelerated versions:
+    * [ForceCompt_par_v2](https://github.com/piepor/particles-simulation-parallel/blob/9aba280d10bd8cc36bb56d3a3e9b3f10f0379fd3/particles_second_opt_not_enough.cu)
+    * [ForceCompt_par_v3](https://github.com/piepor/particles-simulation-parallel/blob/9aba280d10bd8cc36bb56d3a3e9b3f10f0379fd3/particles_second_opt_two_streams.cu)
+    * [Acceleration of ParticleScreen](https://github.com/piepor/particles-simulation-parallel/blob/9aba280d10bd8cc36bb56d3a3e9b3f10f0379fd3/particles_third_opt.cu)
