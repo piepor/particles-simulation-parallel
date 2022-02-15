@@ -997,12 +997,12 @@ int main(int argc, char *argv[]) {
         flops = (2 + (24 * Particles.np - 1)) / pow(10, 9);//  * Particles.np / 100000000000;//(2 + (24 * Particles.np) * Particles.np)/ 1000000;// / (time_kernel/1000);
         flops = flops * Particles.np / (time_kernel/1000);
         //bandwidth = ((2 * sizeof(double) * Particles.np + sizeof(double) * Particles.np + sizeof(double) * Particles.np + sizeof(double) * Particles.np + sizeof(int)) / pow(10, 9)) / (time_kernel/1000);
-        bandwidth = (sizeof(int) + (8 * sizeof(double) + 20 * sizeof(double)) * Particles.np) / pow(10, 9);
+        bandwidth = (sizeof(int) + (8 * sizeof(double) + 20 * sizeof(double)) * (Particles.np - 1)) / pow(10, 9);
         bandwidth = bandwidth * Particles.np / (time_kernel/1000);
         fprintf(stdout, "Step %d of %d\n", k + 1, MaxSteps);
         fprintf(stdout, "Bandwidth first kernel: %f\n", bandwidth);
         fprintf(stdout, "Flops first kernel: %.4lf\n", flops);
-        fprintf(stdout, "Time first kernel: %.4lf s\n", time_kernel/1000);
+        fprintf(stdout, "Time first kernel: %.4lf ms\n", time_kernel);
     };
 
     HANDLE_ERROR(cudaEventDestroy(start));
