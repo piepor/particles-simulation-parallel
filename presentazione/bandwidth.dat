@@ -1,15 +1,36 @@
 Bandwidth first kernel first opt
-* 0.006349 GB/s
-* 0.006783 GB/s
-* 0.007238 GB/s
-* 0.007338 GB/s
-* 0.007335 GB/s
-* 0.006907 GB/s
-* 0.006639 GB/s
-* 0.006557 GB/s 
-* 0.007904 GB/s
-
-
 teorico solo GPU 696 GB/s
+* 778.484 GB/s
+* 966.254 GB/s
+* 964.711 GB/s
+* 966.450 GB/s
+* 966.468 GB/s
+* 966.451 GB/s
+* 964.170 GB/s 
+* 966.207 GB/s
+* 966.366 GB/s
+* 966.592 GB/s
 
+flops
+* 83.409 GFLOPs/s
+* 103.527 GFLOPs/s
+* 103.362 GFLOPs/s
+* 103.548 GFLOPs/s
+* 103.550 GFLOPs/s
+* 103.548 GFLOPs/s
+* 103.304 GFLOPs/s
+* 103.522 GFLOPs/s
+* 103.539 GFLOPs/s
+* 103.564 GFLOPs/s
 
+time
+* 0.1312 s
+* 0.1057 s
+* 0.1059 s
+* 0.1057 s
+* 0.1057 s
+* 0.1057 s
+* 0.1059 s
+* 0.1057 s
+* 0.1057 s
+* 0.1057 s
